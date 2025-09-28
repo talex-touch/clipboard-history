@@ -63,5 +63,6 @@
   ],
   "debug.javascript.defaultRuntimeExecutable": {
     "pwa-node": "/Users/talexdreamsoul/.local/share/mise/shims/node"
-  }
+  },
+  "vue3snippets.enable-compile-vue-file-on-did-save-code": false
 }

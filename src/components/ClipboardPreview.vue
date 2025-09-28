@@ -4,84 +4,450 @@ import { computed } from 'vue'
 
 const props = defineProps<{
   item: PluginClipboardItem | null
+  favoritePending: boolean
+  deletePending: boolean
+  formatTimestamp: (timestamp: PluginClipboardItem['timestamp']) => string
 }>()
 
-const formattedTimestamp = computed(() => {
-  if (!props.item?.timestamp)
-    return '未记录时间'
+const emit = defineEmits<{
+  (event: 'toggleFavorite'): void
+  (event: 'delete'): void
+}>()
 
-  const date = props.item.timestamp instanceof Date
-    ? props.item.timestamp
-    : new Date(props.item.timestamp)
+interface InfoRow {
+  label: string
+  value: string
+  icon: string
+}
 
-  if (Number.isNaN(date.getTime()))
-    return '未记录时间'
+const typeIconMap: Record<string, string> = {
+  text: 'i-carbon-text-align-left',
+  image: 'i-carbon-image',
+  html: 'i-carbon-code',
+  richtext: 'i-carbon-text-style',
+  files: 'i-carbon-document',
+  file: 'i-carbon-document',
+  url: 'i-carbon-link',
+  application: 'i-carbon-application-web',
+}
 
-  return new Intl.DateTimeFormat('zh-CN', {
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-  }).format(date)
+const currentIcon = computed(() => {
+  if (!props.item?.type)
+    return 'i-carbon-clipboard'
+  return typeIconMap[props.item.type] ?? 'i-carbon-clipboard'
 })
+
+const typeLabel = computed(() => {
+  const type = props.item?.type
+  if (!type)
+    return '未知类型'
+  switch (type) {
+    case 'text':
+      return '文本'
+    case 'image':
+      return '图片'
+    case 'files':
+    case 'file':
+      return '文件'
+    case 'html':
+      return 'HTML'
+    case 'richtext':
+      return '富文本'
+    case 'url':
+      return '链接'
+    case 'application':
+      return '应用数据'
+    default:
+      return type
+  }
+})
+
+const timestampText = computed(() => props.item ? props.formatTimestamp(props.item.timestamp) : '')
+
+const infoRows = computed(() => {
+  if (!props.item)
+    return []
+
+  const rows: InfoRow[] = [
+    { label: '类型', value: typeLabel.value, icon: 'i-carbon-tag' },
+    { label: '记录时间', value: timestampText.value, icon: 'i-carbon-time' },
+  ]
+
+  if (props.item.isFavorite)
+    rows.push({ label: '收藏状态', value: '已收藏', icon: 'i-carbon-star-filled' })
+  if (props.item.sourceApp)
+    rows.push({ label: '来源应用', value: props.item.sourceApp, icon: 'i-carbon-application' })
+  if (props.item.id !== undefined && props.item.id !== null)
+    rows.push({ label: '标识符', value: String(props.item.id), icon: 'i-carbon-hash' })
+
+  return rows
+})
+
+const fileList = computed(() => {
+  if (!props.item)
+    return []
+  const raw = props.item.rawContent
+  if (Array.isArray(raw))
+    return raw.map(String)
+  if (typeof raw === 'string')
+    return raw.split(/\n|;/).map(line => line.trim()).filter(Boolean)
+  return []
+})
+
+const previewText = computed(() => props.item?.content ?? '')
+
+function handleToggleFavorite() {
+  emit('toggleFavorite')
+}
+
+function handleDelete() {
+  emit('delete')
+}
 </script>
 
 <template>
   <div class="clipboard-preview">
-    <div v-if="item">
-      <div v-if="item.type === 'text'">
-        <pre>{{ item.content }}</pre>
+    <header class="preview-header">
+      <div class="header-main">
+        <div class="type-pill" aria-hidden="true">
+          <span :class="currentIcon" />
+        </div>
+        <div class="title-block">
+          <h2>{{ item ? '剪贴内容预览' : '选择一个项目预览' }}</h2>
+          <p v-if="item" class="subtitle">
+            <span class="i-carbon-time" aria-hidden="true" />
+            {{ timestampText }}
+          </p>
+        </div>
       </div>
-      <div v-else-if="item.type === 'image'">
-        <img :src="item.thumbnail || item.content" alt="Image preview">
+      <div class="header-actions">
+        <button
+          class="action-button"
+          type="button"
+          :disabled="favoritePending || !item?.id"
+          @click="handleToggleFavorite"
+        >
+          <span :class="item?.isFavorite ? 'i-carbon-star-filled' : 'i-carbon-star'" aria-hidden="true" />
+          {{
+            favoritePending
+              ? '更新中…'
+              : item?.isFavorite
+                ? '取消收藏'
+                : '设为收藏'
+          }}
+        </button>
+        <button
+          class="action-button danger"
+          type="button"
+          :disabled="deletePending || !item?.id"
+          @click="handleDelete"
+        >
+          <span class="i-carbon-delete" aria-hidden="true" />
+          {{ deletePending ? '删除中…' : '删除' }}
+        </button>
       </div>
-      <div v-else-if="item.type === 'files'">
-        <pre>{{ item.rawContent ?? item.content }}</pre>
+    </header>
+
+    <div class="preview-surface">
+      <div v-if="!item" class="preview-empty">
+        <div class="empty-icon" aria-hidden="true">
+          <span class="i-carbon-arrow-up-right" aria-hidden="true" />
+        </div>
+        <p>在左侧选择一个剪贴记录以查看详情</p>
       </div>
-      <div class="timestamp">
-        {{ formattedTimestamp }}
-      </div>
+      <template v-else>
+        <div v-if="item.type === 'text' || item.type === 'html' || item.type === 'richtext'" class="preview-block text">
+          <pre>{{ previewText }}</pre>
+        </div>
+        <div v-else-if="item.type === 'image'" class="preview-block image">
+          <img :src="item.thumbnail || item.content" alt="剪贴图片预览">
+        </div>
+        <div v-else-if="item.type === 'files' || item.type === 'file'" class="preview-block files">
+          <ul>
+            <li v-for="(file, index) in fileList" :key="index">
+              <span class="i-carbon-document" aria-hidden="true" />
+              {{ file }}
+            </li>
+          </ul>
+          <pre v-if="!fileList.length">{{ item.rawContent ?? item.content }}</pre>
+        </div>
+        <div v-else class="preview-block text">
+          <pre>{{ previewText }}</pre>
+        </div>
+      </template>
     </div>
-    <div v-else class="no-item-selected">
-      <p>Select an item to preview</p>
-    </div>
+
+    <dl v-if="item" class="preview-info">
+      <div v-for="row in infoRows" :key="row.label" class="info-row">
+        <dt>
+          <span :class="row.icon" aria-hidden="true" />
+          {{ row.label }}
+        </dt>
+        <dd>{{ row.value }}</dd>
+      </div>
+    </dl>
   </div>
 </template>
 
 <style scoped>
 .clipboard-preview {
+  position: relative;
+  display: flex;
+  flex-direction: column;
   height: 100%;
+  padding: 28px 26px 22px;
+  gap: 22px;
+  box-sizing: border-box;
 }
 
-.clipboard-preview img {
-  max-width: 100%;
-  border-radius: 12px;
-  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.15);
+.preview-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
 }
 
-.clipboard-preview pre {
+.header-main {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  min-width: 0;
+}
+
+.type-pill {
+  width: 52px;
+  height: 52px;
+  border-radius: 18px;
+  background: linear-gradient(145deg, rgba(99, 102, 241, 0.18), rgba(79, 70, 229, 0.32));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #4f46e5;
+  font-size: 1.6rem;
+}
+
+.type-pill > span {
+  font-size: 1.6rem;
+}
+
+.title-block h2 {
+  margin: 0;
+  font-size: 1.3rem;
+  font-weight: 600;
+  color: #111827;
+}
+
+.subtitle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 6px 0 0;
+  font-size: 0.85rem;
+  color: #64748b;
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.action-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  border-radius: 999px;
+  border: 1px solid rgba(148, 163, 184, 0.32);
+  background: rgba(255, 255, 255, 0.9);
+  color: #475569;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.18s ease;
+}
+
+.action-button:hover:not(:disabled) {
+  background: #ffffff;
+  border-color: rgba(99, 102, 241, 0.45);
+  box-shadow: 0 10px 24px rgba(79, 70, 229, 0.16);
+}
+
+.action-button.danger {
+  color: #dc2626;
+  border-color: rgba(239, 68, 68, 0.35);
+}
+
+.action-button.danger:hover:not(:disabled) {
+  border-color: rgba(239, 68, 68, 0.55);
+  box-shadow: 0 10px 24px rgba(239, 68, 68, 0.16);
+}
+
+.action-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.preview-surface {
+  position: relative;
+  flex: 1;
+  border-radius: 22px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(245, 247, 252, 0.92));
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  padding: 24px;
+  overflow-y: auto;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.65);
+}
+
+.preview-empty {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  color: #94a3b8;
+}
+
+.preview-empty .empty-icon {
+  width: 64px;
+  height: 64px;
+  border-radius: 20px;
+  background: linear-gradient(150deg, rgba(148, 163, 184, 0.16), rgba(148, 163, 184, 0.3));
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #94a3b8;
+  font-size: 1.6rem;
+}
+
+.preview-block {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.preview-block.text pre {
   margin: 0;
   padding: 16px;
-  border-radius: 12px;
-  background: rgba(15, 23, 42, 0.04);
+  border-radius: 16px;
+  background: rgba(15, 23, 42, 0.05);
   color: #1f2937;
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Courier New', monospace;
   white-space: pre-wrap;
   word-break: break-word;
+  line-height: 1.5;
 }
 
-.no-item-selected {
-  display: flex;
-  justify-content: center;
+.preview-block.image {
   align-items: center;
-  height: 100%;
-  color: #888;
 }
 
-.timestamp {
-  margin-top: 1rem;
-  font-size: 0.8rem;
-  color: #666;
+.preview-block.image img {
+  max-width: 100%;
+  border-radius: 20px;
+  box-shadow: 0 18px 42px rgba(15, 23, 42, 0.18);
+}
+
+.preview-block.files ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.preview-block.files li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: rgba(148, 163, 184, 0.12);
+  color: #334155;
+}
+
+.preview-block.files pre {
+  margin: 0;
+  padding: 14px;
+  border-radius: 14px;
+  background: rgba(15, 23, 42, 0.05);
+  color: #1f2937;
+  font-size: 0.9rem;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.preview-info {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 14px;
+}
+
+.info-row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 14px;
+  border-radius: 18px;
+  background: rgba(148, 163, 184, 0.12);
+  color: #1f2937;
+}
+
+.info-row dt {
+  margin: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #64748b;
+}
+
+.info-row dd {
+  margin: 0;
+  font-weight: 600;
+  word-break: break-word;
+}
+
+.preview-surface::-webkit-scrollbar {
+  width: 6px;
+}
+
+.preview-surface::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.45);
+  border-radius: 999px;
+}
+
+.preview-surface::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+@media (max-width: 1024px) {
+  .clipboard-preview {
+    padding: 22px 20px 18px;
+  }
+
+  .preview-surface {
+    border-radius: 20px;
+  }
+}
+
+@media (max-width: 860px) {
+  .preview-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .header-actions {
+    align-self: stretch;
+  }
+
+  .action-button {
+    flex: 1;
+    justify-content: center;
+  }
 }
 </style>
