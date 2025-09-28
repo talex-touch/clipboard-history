@@ -18,6 +18,7 @@
   },
   "dependencies": {
     "@talex-touch/unplugin-export-plugin": "catalog:",
+    "@talex-touch/utils": "catalog:",
     "@unhead/vue": "catalog:frontend",
     "@unocss/reset": "catalog:frontend",
     "@vueuse/core": "catalog:frontend",
