@@ -6,10 +6,10 @@ defineOptions({
 
 <template>
   <div class="clipboard-page-holder">
-    <aside class="holder-aside w-[30%]" role="complementary">
+    <aside class="holder-aside w-[40%]" role="complementary">
       <slot name="aside" />
     </aside>
-    <section class="holder-main w-[70%]" role="region">
+    <section class="holder-main w-[60%]" role="region">
       <slot name="main" />
     </section>
   </div>

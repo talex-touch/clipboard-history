@@ -82,7 +82,7 @@ const summaryText = computed(() => {
 
 const activeFilterLabel = computed(() => {
   const active = filterOptions.find(option => option.value === filterState.selectedFilter.value)
-  return active ? `筛选：${active.label}` : '筛选'
+  return active ? `${active.label}` : '筛选'
 })
 
 const hasItems = computed(() => filterState.filteredItems.value.length > 0)
@@ -128,12 +128,12 @@ function toggleFilterPanel() {
 
 <template>
   <div
-    class="clipboard-list"
+    class="ClipboardList items-between h-full flex flex-col justify-center gap-2 overflow-hidden py-2"
     role="listbox"
     tabindex="0"
     :aria-activedescendant="selectedKey ? `clipboard-item-${selectedKey}` : undefined"
   >
-    <div ref="filterControlsRef" class="header-wrapper">
+    <div ref="filterControlsRef" class="header-wrapper px-2">
       <ClipboardListHeader
         :summary-text="summaryText"
         :is-loading="isLoading"
@@ -156,7 +156,7 @@ function toggleFilterPanel() {
     </div>
 
     <div ref="scrollAreaRef" class="list-scroll">
-      <div v-if="hasItems" class="list-sections">
+      <div v-if="hasItems" class="list-sections h-[100px] overflow-y-scroll">
         <ClipboardSection
           v-for="section in groupedSections"
           :key="section.key"
@@ -195,16 +195,6 @@ function toggleFilterPanel() {
 </template>
 
 <style scoped>
-.clipboard-list {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-  padding: 26px 24px 18px;
-  gap: 18px;
-  box-sizing: border-box;
-}
-
 .header-wrapper {
   position: relative;
   display: flex;
@@ -254,11 +244,5 @@ function toggleFilterPanel() {
 
 .list-scroll::-webkit-scrollbar-track {
   background: transparent;
-}
-
-@media (max-width: 1024px) {
-  .clipboard-list {
-    padding: 22px 18px 14px;
-  }
 }
 </style>
