@@ -8,7 +8,6 @@ import ClipboardEmptyState from '~/components/clipboard-list/ClipboardEmptyState
 import ClipboardItemCard from '~/components/clipboard-list/ClipboardItemCard.vue'
 import ClipboardListFilterPanel from '~/components/clipboard-list/ClipboardListFilterPanel.vue'
 import ClipboardListHeader from '~/components/clipboard-list/ClipboardListHeader.vue'
-import ClipboardListToolbar from '~/components/clipboard-list/ClipboardListToolbar.vue'
 import ClipboardLoadMore from '~/components/clipboard-list/ClipboardLoadMore.vue'
 import ClipboardSection from '~/components/clipboard-list/ClipboardSection.vue'
 import { useClipboardFilters } from '~/composables/useClipboardFilters'
@@ -133,13 +132,17 @@ function toggleFilterPanel() {
     tabindex="0"
     :aria-activedescendant="selectedKey ? `clipboard-item-${selectedKey}` : undefined"
   >
-    <div ref="filterControlsRef" class="header-wrapper px-2">
+    <div ref="filterControlsRef" class="px-2">
       <ClipboardListHeader
         :summary-text="summaryText"
         :is-loading="isLoading"
         :active-filter-label="activeFilterLabel"
         :has-active-filter="filterState.hasActiveFilter.value"
+        :is-clearing="isClearing"
+        :has-items="hasItems"
         @toggle-filter="toggleFilterPanel"
+        @refresh="handleRefresh"
+        @clear="handleClear"
       />
 
       <ClipboardListFilterPanel
@@ -155,8 +158,8 @@ function toggleFilterPanel() {
       <span>{{ errorMessage }}</span>
     </div>
 
-    <div ref="scrollAreaRef" class="list-scroll">
-      <div v-if="hasItems" class="list-sections h-[100px] overflow-y-scroll">
+    <div ref="scrollAreaRef" class="h-full overflow-y-auto" tabindex="-1">
+      <template v-if="hasItems">
         <ClipboardSection
           v-for="section in groupedSections"
           :key="section.key"
@@ -173,7 +176,7 @@ function toggleFilterPanel() {
             @select="handleSelect"
           />
         </ClipboardSection>
-      </div>
+      </template>
       <ClipboardEmptyState v-else :is-loading="isLoading" />
 
       <ClipboardLoadMore
@@ -182,42 +185,11 @@ function toggleFilterPanel() {
         :is-loading-more="isLoadingMore"
         @load-more="handleLoadMore"
       />
-
-      <ClipboardListToolbar
-        :is-loading="isLoading"
-        :is-clearing="isClearing"
-        :has-items="hasItems"
-        @refresh="handleRefresh"
-        @clear="handleClear"
-      />
     </div>
   </div>
 </template>
 
 <style scoped>
-.header-wrapper {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.list-scroll {
-  position: relative;
-  flex: 1;
-  overflow-y: auto;
-  padding-right: 4px;
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-.list-sections {
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-}
-
 .list-error {
   display: flex;
   align-items: center;
@@ -227,22 +199,5 @@ function toggleFilterPanel() {
   background: rgba(248, 113, 113, 0.12);
   color: #b91c1c;
   font-size: 0.82rem;
-}
-
-.list-error > span[aria-hidden='true'] {
-  font-size: 0.98rem;
-}
-
-.list-scroll::-webkit-scrollbar {
-  width: 6px;
-}
-
-.list-scroll::-webkit-scrollbar-thumb {
-  background: rgba(148, 163, 184, 0.45);
-  border-radius: 999px;
-}
-
-.list-scroll::-webkit-scrollbar-track {
-  background: transparent;
 }
 </style>

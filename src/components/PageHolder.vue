@@ -5,7 +5,7 @@ defineOptions({
 </script>
 
 <template>
-  <div class="clipboard-page-holder">
+  <div class="clipboard-page-holder absolute left-0 top-0 h-full w-full flex overflow-hidden">
     <aside class="holder-aside w-[40%]" role="complementary">
       <slot name="aside" />
     </aside>
@@ -16,14 +16,6 @@ defineOptions({
 </template>
 
 <style scoped>
-.clipboard-page-holder {
-  position: relative;
-  inset: 0;
-  display: flex;
-  min-height: 100%;
-  box-sizing: border-box;
-}
-
 .holder-aside,
 .holder-main {
   position: relative;

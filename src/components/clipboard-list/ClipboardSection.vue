@@ -6,30 +6,23 @@ defineProps<{
 </script>
 
 <template>
-  <section class="clipboard-section">
-    <header class="section-header">
+  <section class="flex flex-col gap-2">
+    <header class="section-header p-2">
       <h3>{{ title }} ({{ count }}条)</h3>
     </header>
-    <ul class="section-list" role="presentation">
+    <ul class="flex flex-col list-none gap-2 p-2" role="presentation">
       <slot />
     </ul>
   </section>
 </template>
 
 <style scoped>
-.clipboard-section {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
 .section-header {
   position: sticky;
   top: 0;
   z-index: 5;
-  padding: 6px 0;
   background: linear-gradient(180deg, rgba(248, 249, 252, 0.92), rgba(248, 249, 252, 0.78));
-  backdrop-filter: blur(2px);
+  backdrop-filter: blur(18px) saturate(180%);
 }
 
 .section-header h3 {
@@ -38,14 +31,5 @@ defineProps<{
   font-weight: 600;
   color: #475569;
   letter-spacing: 0.02em;
-}
-
-.section-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
 }
 </style>

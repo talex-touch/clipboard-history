@@ -1,17 +1,30 @@
 <script setup lang="ts">
-defineProps<{
+const props = defineProps<{
   summaryText: string
   isLoading: boolean
   activeFilterLabel: string
   hasActiveFilter: boolean
+  isClearing: boolean
+  hasItems: boolean
 }>()
 
 const emit = defineEmits<{
   (event: 'toggleFilter'): void
+  (event: 'refresh'): void
+  (event: 'clear'): void
 }>()
 
 function handleToggleFilter() {
   emit('toggleFilter')
+}
+function handleRefresh() {
+  if (!props.isLoading)
+    emit('refresh')
+}
+
+function handleClear() {
+  if (!props.isClearing && props.hasItems)
+    emit('clear')
 }
 </script>
 
@@ -38,6 +51,22 @@ function handleToggleFilter() {
         <span class="h-3 w-3 animate-spin border-2 border-slate-300 border-t-indigo-500 rounded-full dark:border-slate-600 dark:border-t-indigo-500" aria-hidden="true" />
         正在同步…
       </div>
+      <button
+        class="rounded-full p-1.5 text-slate-500 transition disabled:(cursor-not-allowed opacity-60) hover:(bg-slate-200/60 text-slate-700) dark:(text-slate-400) dark:hover:(bg-slate-700/60 text-slate-200)"
+        type="button"
+        :disabled="isLoading"
+        @click="handleRefresh"
+      >
+        <span class="i-carbon-renew block" aria-hidden="true" />
+      </button>
+      <button
+        class="rounded-full p-1.5 text-red-500/80 transition disabled:(cursor-not-allowed opacity-60) hover:(bg-red-500/10 text-red-500) dark:(text-red-500/90) dark:hover:(bg-red-500/20 text-red-400)"
+        type="button"
+        :disabled="isClearing || !hasItems"
+        @click="handleClear"
+      >
+        <span class="i-carbon-trash-can block" aria-hidden="true" />
+      </button>
     </div>
   </header>
 </template>
