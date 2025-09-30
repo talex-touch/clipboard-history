@@ -1,7 +1,21 @@
 <script setup lang="ts">
 import type { PluginClipboardItem } from '@talex-touch/utils/plugin/sdk/types'
+import type { FilterOption } from '~/composables/useClipboardFilters'
+import type { SectionDefinition } from '~/composables/useClipboardSections'
+import { onClickOutside, useEventListener } from '@vueuse/core'
 import { computed, ref } from 'vue'
+import ClipboardEmptyState from '~/components/clipboard-list/ClipboardEmptyState.vue'
+import ClipboardItemCard from '~/components/clipboard-list/ClipboardItemCard.vue'
+import ClipboardListFilterPanel from '~/components/clipboard-list/ClipboardListFilterPanel.vue'
+import ClipboardListHeader from '~/components/clipboard-list/ClipboardListHeader.vue'
+import ClipboardListToolbar from '~/components/clipboard-list/ClipboardListToolbar.vue'
+import ClipboardLoadMore from '~/components/clipboard-list/ClipboardLoadMore.vue'
+import ClipboardSection from '~/components/clipboard-list/ClipboardSection.vue'
+import { useClipboardFilters } from '~/composables/useClipboardFilters'
 import { getItemKey } from '~/composables/useClipboardManager'
+import { useClipboardSections } from '~/composables/useClipboardSections'
+
+type FilterValue = ReturnType<typeof useClipboardFilters>['selectedFilter']['value']
 
 const props = defineProps<{
   items: PluginClipboardItem[]
@@ -23,57 +37,65 @@ const emit = defineEmits<{
   (event: 'loadMore'): void
 }>()
 
+const filterOptions: FilterOption[] = [
+  { value: 'all', label: '全部内容', icon: 'i-carbon-list' },
+  { value: 'favorites', label: '仅收藏', icon: 'i-carbon-star' },
+  { value: 'text', label: '仅文本', icon: 'i-carbon-text-align-left' },
+  { value: 'image', label: '仅图片', icon: 'i-carbon-image' },
+  { value: 'files', label: '仅文件', icon: 'i-carbon-document' },
+  { value: 'url', label: '仅链接', icon: 'i-carbon-link' },
+  { value: 'application', label: '仅应用数据', icon: 'i-carbon-application-web' },
+]
+
+const sectionDefinitions: SectionDefinition[] = [
+  { key: 'today', title: '今天' },
+  { key: 'threeDays', title: '3天内' },
+  { key: 'oneWeek', title: '1周内' },
+  { key: 'oneMonth', title: '1月内' },
+  { key: 'lastMonth', title: '上个月' },
+  { key: 'threeMonths', title: '3个月内' },
+  { key: 'forever', title: '永久' },
+]
+
 const scrollAreaRef = ref<HTMLElement | null>(null)
+const filterControlsRef = ref<HTMLElement | null>(null)
+
+const filterState = useClipboardFilters({
+  items: () => props.items,
+  filterOptions,
+})
+
+const { groupedSections } = useClipboardSections({
+  items: () => filterState.filteredItems.value,
+  sections: sectionDefinitions,
+})
 
 const summaryText = computed(() => {
   if (!props.total)
     return '暂无记录'
-  const pageSizeText = props.pageSize ? `· 每页 ${props.pageSize} 条` : ''
-  return `共 ${props.total} 条记录 ${pageSizeText}`
+
+  if (!filterState.hasActiveFilter.value)
+    return `共 ${props.total} 条记录`
+
+  return `筛选结果 ${filterState.filteredItems.value.length} 条 / 总 ${props.total} 条`
 })
 
-const hasItems = computed(() => props.items.length > 0)
+const activeFilterLabel = computed(() => {
+  const active = filterOptions.find(option => option.value === filterState.selectedFilter.value)
+  return active ? `筛选：${active.label}` : '筛选'
+})
 
-const typeIconMap: Record<string, string> = {
-  text: 'i-carbon-text-align-left',
-  image: 'i-carbon-image',
-  html: 'i-carbon-code',
-  richtext: 'i-carbon-text-style',
-  files: 'i-carbon-document',
-  file: 'i-carbon-document',
-  url: 'i-carbon-link',
-  application: 'i-carbon-application-web',
-}
+const hasItems = computed(() => filterState.filteredItems.value.length > 0)
 
-function resolveTypeIcon(type?: PluginClipboardItem['type']) {
-  if (!type)
-    return 'i-carbon-clipboard'
-  return typeIconMap[type] ?? 'i-carbon-clipboard'
-}
+onClickOutside(filterControlsRef, () => {
+  if (filterState.isPanelOpen.value)
+    filterState.closePanel()
+})
 
-function resolveTypeLabel(type?: PluginClipboardItem['type']) {
-  if (!type)
-    return '未知类型'
-  switch (type) {
-    case 'text':
-      return '文本'
-    case 'image':
-      return '图片'
-    case 'files':
-    case 'file':
-      return '文件'
-    case 'html':
-      return 'HTML'
-    case 'richtext':
-      return '富文本'
-    case 'url':
-      return '链接'
-    case 'application':
-      return '应用数据'
-    default:
-      return type
-  }
-}
+useEventListener(document, 'keydown', (event: KeyboardEvent) => {
+  if (event.key === 'Escape' && filterState.isPanelOpen.value)
+    filterState.closePanel()
+})
 
 function handleSelect(item: PluginClipboardItem) {
   emit('select', item)
@@ -92,6 +114,16 @@ function handleLoadMore() {
   if (scrollAreaRef.value)
     scrollAreaRef.value.scrollTop = scrollAreaRef.value.scrollHeight
 }
+
+function handleFilterChange(value: FilterValue) {
+  filterState.setFilter(value)
+  if (scrollAreaRef.value)
+    scrollAreaRef.value.scrollTo({ top: 0, behavior: 'smooth' })
+}
+
+function toggleFilterPanel() {
+  filterState.togglePanel()
+}
 </script>
 
 <template>
@@ -101,20 +133,22 @@ function handleLoadMore() {
     tabindex="0"
     :aria-activedescendant="selectedKey ? `clipboard-item-${selectedKey}` : undefined"
   >
-    <header class="list-header">
-      <div class="header-title">
-        <span class="title-icon" aria-hidden="true">
-          <span class="i-carbon-clipboard" aria-hidden="true" />
-        </span>
-        <div class="title-text">
-          <h2>剪贴板历史</h2>
-          <p>{{ summaryText }}</p>
-        </div>
-      </div>
-      <div v-if="isLoading" class="list-status">
-        <span class="spinner" aria-hidden="true" /> 正在同步…
-      </div>
-    </header>
+    <div ref="filterControlsRef" class="header-wrapper">
+      <ClipboardListHeader
+        :summary-text="summaryText"
+        :is-loading="isLoading"
+        :active-filter-label="activeFilterLabel"
+        :has-active-filter="filterState.hasActiveFilter.value"
+        @toggle-filter="toggleFilterPanel"
+      />
+
+      <ClipboardListFilterPanel
+        v-if="filterState.isPanelOpen.value"
+        :items="filterState.filterMenuItems.value"
+        :selected="filterState.selectedFilter.value"
+        @select="handleFilterChange"
+      />
+    </div>
 
     <div v-if="errorMessage" class="list-error" role="alert">
       <span class="i-carbon-warning" aria-hidden="true" />
@@ -122,95 +156,40 @@ function handleLoadMore() {
     </div>
 
     <div ref="scrollAreaRef" class="list-scroll">
-      <ul class="list-body">
-        <li
-          v-for="(item, index) in items"
-          :id="`clipboard-item-${getItemKey(item)}`"
-          :key="getItemKey(item)"
-          class="clipboard-item"
-          :data-item-id="getItemKey(item)"
-          :aria-selected="selectedKey === getItemKey(item)"
-          :class="{ active: selectedKey === getItemKey(item) }"
-          role="option"
-          @click="handleSelect(item)"
+      <div v-if="hasItems" class="list-sections">
+        <ClipboardSection
+          v-for="section in groupedSections"
+          :key="section.key"
+          :title="section.title"
+          :count="section.items.length"
         >
-          <div class="item-icon" :class="resolveTypeIcon(item.type)" aria-hidden="true" />
-          <div class="item-main">
-            <p class="item-content" :title="item.content || '（无内容）'">
-              {{ item.content || '（无内容）' }}
-            </p>
-            <div class="item-meta">
-              <span class="meta-chip" :title="resolveTypeLabel(item.type)">
-                <span class="chip-icon" :class="resolveTypeIcon(item.type)" aria-hidden="true" />
-                {{ resolveTypeLabel(item.type) }}
-              </span>
-              <span class="meta-chip">
-                <span class="chip-icon i-carbon-time" aria-hidden="true" />
-                {{ formatTimestamp(item.timestamp) }}
-              </span>
-              <span v-if="item.sourceApp" class="meta-chip" :title="item.sourceApp">
-                <span class="chip-icon i-carbon-application" aria-hidden="true" />
-                {{ item.sourceApp }}
-              </span>
-              <span v-if="item.isFavorite" class="meta-chip favorite">
-                <span class="chip-icon i-carbon-star-filled" aria-hidden="true" />
-                收藏
-              </span>
-            </div>
-          </div>
-          <div class="item-shortcut" aria-hidden="true">
-            <span class="shortcut-key">⌘</span>
-            <span class="shortcut-key">{{ index + 1 }}</span>
-          </div>
-        </li>
-      </ul>
-
-      <button
-        v-if="canLoadMore && !isLoading"
-        class="ghost-button load-more"
-        type="button"
-        :disabled="isLoadingMore"
-        @click="handleLoadMore"
-      >
-        <span class="i-carbon-chevron-down" aria-hidden="true" />
-        {{ isLoadingMore ? '加载中…' : '加载更多' }}
-      </button>
-
-      <div v-if="!hasItems && !isLoading" class="list-empty">
-        <div class="empty-icon" aria-hidden="true">
-          <span class="i-carbon-notebook" aria-hidden="true" />
-        </div>
-        <p>
-          暂无剪贴内容
-        </p>
-        <p class="empty-hint">
-          复制一些文本或图片后会出现在这里
-        </p>
+          <ClipboardItemCard
+            v-for="entry in section.items"
+            :key="getItemKey(entry.item)"
+            :item="entry.item"
+            :index="entry.globalIndex"
+            :is-active="selectedKey === getItemKey(entry.item)"
+            :format-timestamp="formatTimestamp"
+            @select="handleSelect"
+          />
+        </ClipboardSection>
       </div>
+      <ClipboardEmptyState v-else :is-loading="isLoading" />
 
-      <div class="list-toolbar">
-        <div class="toolbar-veil" aria-hidden="true" />
-        <div class="toolbar-content">
-          <button
-            class="toolbar-button"
-            type="button"
-            :disabled="isLoading"
-            @click="handleRefresh"
-          >
-            <span class="i-carbon-renew" aria-hidden="true" />
-            刷新
-          </button>
-          <button
-            class="toolbar-button danger"
-            type="button"
-            :disabled="isClearing || !hasItems"
-            @click="handleClear"
-          >
-            <span class="i-carbon-trash-can" aria-hidden="true" />
-            清空
-          </button>
-        </div>
-      </div>
+      <ClipboardLoadMore
+        :can-load-more="canLoadMore"
+        :is-loading="isLoading"
+        :is-loading-more="isLoadingMore"
+        @load-more="handleLoadMore"
+      />
+
+      <ClipboardListToolbar
+        :is-loading="isLoading"
+        :is-clearing="isClearing"
+        :has-items="hasItems"
+        @refresh="handleRefresh"
+        @clear="handleClear"
+      />
     </div>
   </div>
 </template>
@@ -226,72 +205,27 @@ function handleLoadMore() {
   box-sizing: border-box;
 }
 
-.list-header {
+.header-wrapper {
+  position: relative;
   display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
+  flex-direction: column;
   gap: 12px;
 }
 
-.header-title {
+.list-scroll {
+  position: relative;
+  flex: 1;
+  overflow-y: auto;
+  padding-right: 4px;
   display: flex;
-  align-items: center;
-  gap: 12px;
+  flex-direction: column;
+  gap: 16px;
 }
 
-.title-icon {
-  width: 42px;
-  height: 42px;
-  border-radius: 14px;
-  background: linear-gradient(145deg, rgba(99, 102, 241, 0.18), rgba(79, 70, 229, 0.28));
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.4);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.title-icon > span {
-  font-size: 1.2rem;
-  color: #4f46e5;
-}
-
-.title-text h2 {
-  margin: 0;
-  font-size: 1.1rem;
-  font-weight: 600;
-  color: #1f2937;
-}
-
-.title-text p {
-  margin: 4px 0 0;
-  font-size: 0.82rem;
-  color: #64748b;
-}
-
-.list-status {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 0.85rem;
-  color: #64748b;
-}
-
-.spinner {
-  width: 14px;
-  height: 14px;
-  border-radius: 50%;
-  border: 2px solid rgba(148, 163, 184, 0.4);
-  border-top-color: #6366f1;
-  animation: spin 0.8s linear infinite;
-}
-
-@keyframes spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
+.list-sections {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
 }
 
 .list-error {
@@ -305,279 +239,8 @@ function handleLoadMore() {
   font-size: 0.82rem;
 }
 
-.list-scroll {
-  position: relative;
-  flex: 1;
-  overflow-y: auto;
-  padding-right: 4px;
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-.list-body {
-  list-style: none;
-  padding: 0;
-  margin: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.clipboard-item {
-  display: grid;
-  grid-template-columns: 48px minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 16px;
-  padding: 14px 16px;
-  border-radius: 18px;
-  background: rgba(255, 255, 255, 0.78);
-  border: 1px solid transparent;
-  cursor: pointer;
-  transition:
-    transform 0.18s ease,
-    box-shadow 0.18s ease,
-    background-color 0.18s ease,
-    border-color 0.18s ease;
-}
-
-.clipboard-item:hover,
-.clipboard-item:focus-visible {
-  background: #ffffff;
-  border-color: rgba(99, 102, 241, 0.35);
-  box-shadow: 0 14px 28px rgba(79, 70, 229, 0.18);
-  transform: translateY(-1px);
-}
-
-.clipboard-item.active {
-  background: linear-gradient(140deg, #4f46e5, #6366f1);
-  border-color: transparent;
-  box-shadow: 0 18px 32px rgba(79, 70, 229, 0.3);
-  color: #ffffff;
-}
-
-.item-icon {
-  width: 44px;
-  height: 44px;
-  border-radius: 14px;
-  background: rgba(99, 102, 241, 0.18);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #4f46e5;
-  font-size: 1.4rem;
-}
-
-.clipboard-item.active .item-icon {
-  background: rgba(255, 255, 255, 0.24);
-  color: #ffffff;
-}
-
-.item-main {
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.item-content {
-  margin: 0;
-  font-weight: 600;
-  color: #1e293b;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.clipboard-item.active .item-content {
-  color: #ffffff;
-}
-
-.item-meta {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  font-size: 0.75rem;
-  color: #64748b;
-}
-
-.clipboard-item.active .item-meta {
-  color: rgba(255, 255, 255, 0.78);
-}
-
-.meta-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 4px 10px;
-  border-radius: 999px;
-  background: rgba(148, 163, 184, 0.14);
-  backdrop-filter: blur(4px);
-}
-
-.meta-chip .chip-icon {
-  font-size: 0.9rem;
-}
-
-.meta-chip.favorite {
-  background: rgba(249, 215, 76, 0.2);
-  color: #b45309;
-}
-
-.clipboard-item.active .meta-chip {
-  background: rgba(255, 255, 255, 0.16);
-  color: rgba(255, 255, 255, 0.85);
-}
-
-.clipboard-item.active .meta-chip.favorite {
-  background: rgba(255, 255, 255, 0.28);
-  color: #ffe082;
-}
-
-.item-shortcut {
-  display: inline-flex;
-  gap: 6px;
-  align-items: center;
-  color: #94a3b8;
-  font-size: 0.8rem;
-  font-weight: 600;
-}
-
-.clipboard-item.active .item-shortcut {
-  color: rgba(255, 255, 255, 0.8);
-}
-
-.shortcut-key {
-  min-width: 24px;
-  height: 24px;
-  border-radius: 6px;
-  background: rgba(148, 163, 184, 0.18);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0 6px;
-}
-
-.clipboard-item.active .shortcut-key {
-  background: rgba(255, 255, 255, 0.22);
-}
-
-.ghost-button.load-more {
-  align-self: center;
-  padding: 8px 16px;
-  border-radius: 999px;
-  border: 1px solid rgba(148, 163, 184, 0.3);
-  background: rgba(255, 255, 255, 0.75);
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 0.85rem;
-  cursor: pointer;
-  transition: all 0.18s ease;
-}
-
-.ghost-button.load-more:hover:not(:disabled) {
-  background: #ffffff;
-  border-color: rgba(99, 102, 241, 0.4);
-  box-shadow: 0 8px 16px rgba(79, 70, 229, 0.18);
-}
-
-.ghost-button.load-more:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
-.list-empty {
-  margin: 0 auto;
-  text-align: center;
-  color: #94a3b8;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  padding: 32px 0;
-}
-
-.empty-icon {
-  width: 54px;
-  height: 54px;
-  border-radius: 16px;
-  margin: 0 auto;
-  background: linear-gradient(145deg, rgba(148, 163, 184, 0.12), rgba(148, 163, 184, 0.28));
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  color: #94a3b8;
-  font-size: 1.6rem;
-}
-
-.empty-hint {
-  font-size: 0.78rem;
-  color: #a1acc5;
-  margin: 0;
-}
-
-.list-toolbar {
-  position: sticky;
-  bottom: 0;
-  margin-top: auto;
-  padding-top: 18px;
-}
-
-.toolbar-veil {
-  position: absolute;
-  left: -24px;
-  right: -16px;
-  bottom: 0;
-  height: 120px;
-  background: linear-gradient(180deg, rgba(248, 249, 252, 0), rgba(248, 249, 252, 0.96));
-  backdrop-filter: blur(14px);
-  pointer-events: none;
-  border-radius: 0 0 24px 24px;
-}
-
-.toolbar-content {
-  position: relative;
-  display: flex;
-  gap: 12px;
-  justify-content: space-between;
-  padding: 18px 12px 6px;
-}
-
-.toolbar-button {
-  flex: 1;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  padding: 10px 0;
-  border-radius: 16px;
-  border: 1px solid rgba(148, 163, 184, 0.3);
-  background: rgba(255, 255, 255, 0.82);
-  color: #475569;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.toolbar-button:hover:not(:disabled) {
-  background: #ffffff;
-  border-color: rgba(99, 102, 241, 0.45);
-  box-shadow: 0 12px 25px rgba(79, 70, 229, 0.16);
-}
-
-.toolbar-button.danger {
-  color: #dc2626;
-  border-color: rgba(239, 68, 68, 0.35);
-}
-
-.toolbar-button.danger:hover:not(:disabled) {
-  border-color: rgba(239, 68, 68, 0.55);
-  box-shadow: 0 12px 25px rgba(239, 68, 68, 0.18);
-}
-
-.toolbar-button:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
+.list-error > span[aria-hidden='true'] {
+  font-size: 0.98rem;
 }
 
 .list-scroll::-webkit-scrollbar {
@@ -596,10 +259,6 @@ function handleLoadMore() {
 @media (max-width: 1024px) {
   .clipboard-list {
     padding: 22px 18px 14px;
-  }
-
-  .clipboard-item {
-    grid-template-columns: 44px minmax(0, 1fr) auto;
   }
 }
 </style>

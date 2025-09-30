@@ -36,9 +36,11 @@ declare global {
   const eagerComputed: typeof import('@vueuse/core')['eagerComputed']
   const effectScope: typeof import('vue')['effectScope']
   const extendRef: typeof import('@vueuse/core')['extendRef']
+  const formatTimestamp: typeof import('./composables/useClipboardManager')['formatTimestamp']
   const getActiveHead: typeof import('@unhead/vue')['getActiveHead']
   const getCurrentInstance: typeof import('vue')['getCurrentInstance']
   const getCurrentScope: typeof import('vue')['getCurrentScope']
+  const getItemKey: typeof import('./composables/useClipboardManager')['getItemKey']
   const h: typeof import('vue')['h']
   const ignorableWatch: typeof import('@vueuse/core')['ignorableWatch']
   const inject: typeof import('vue')['inject']
@@ -106,6 +108,7 @@ declare global {
   const toReactive: typeof import('@vueuse/core')['toReactive']
   const toRef: typeof import('vue')['toRef']
   const toRefs: typeof import('vue')['toRefs']
+  const toTimestampMs: typeof import('./composables/useClipboardSections')['toTimestampMs']
   const toValue: typeof import('vue')['toValue']
   const toggleDark: typeof import('./composables/dark')['toggleDark']
   const triggerRef: typeof import('vue')['triggerRef']
@@ -141,8 +144,11 @@ declare global {
   const useBroadcastChannel: typeof import('@vueuse/core')['useBroadcastChannel']
   const useBrowserLocation: typeof import('@vueuse/core')['useBrowserLocation']
   const useCached: typeof import('@vueuse/core')['useCached']
-  const useClipboard: typeof import('@vueuse/core')['useClipboard']
+  const useClipboard: typeof import('./composables/useClipboard')['useClipboard']
+  const useClipboardFilters: typeof import('./composables/useClipboardFilters')['useClipboardFilters']
   const useClipboardItems: typeof import('@vueuse/core')['useClipboardItems']
+  const useClipboardManager: typeof import('./composables/useClipboardManager')['useClipboardManager']
+  const useClipboardSections: typeof import('./composables/useClipboardSections')['useClipboardSections']
   const useCloned: typeof import('@vueuse/core')['useCloned']
   const useColorMode: typeof import('@vueuse/core')['useColorMode']
   const useConfirmDialog: typeof import('@vueuse/core')['useConfirmDialog']
@@ -315,6 +321,15 @@ declare global {
   // @ts-ignore
   export type { Component, Slot, Slots, ComponentPublicInstance, ComputedRef, DirectiveBinding, ExtractDefaultPropTypes, ExtractPropTypes, ExtractPublicPropTypes, InjectionKey, PropType, Ref, MaybeRef, MaybeRefOrGetter, VNode, WritableComputedRef } from 'vue'
   import('vue')
+  // @ts-ignore
+  export type { ClipboardItem } from './composables/useClipboard'
+  import('./composables/useClipboard')
+  // @ts-ignore
+  export type { FilterMenuItem, UseClipboardFiltersConfig, FilterOption, FilterValue } from './composables/useClipboardFilters'
+  import('./composables/useClipboardFilters')
+  // @ts-ignore
+  export type { SectionDefinition, SectionEntry, GroupedSection, UseClipboardSectionsConfig } from './composables/useClipboardSections'
+  import('./composables/useClipboardSections')
 }
 
 // for vue template auto import
@@ -350,8 +365,10 @@ declare module 'vue' {
     readonly eagerComputed: UnwrapRef<typeof import('@vueuse/core')['eagerComputed']>
     readonly effectScope: UnwrapRef<typeof import('vue')['effectScope']>
     readonly extendRef: UnwrapRef<typeof import('@vueuse/core')['extendRef']>
+    readonly formatTimestamp: UnwrapRef<typeof import('./composables/useClipboardManager')['formatTimestamp']>
     readonly getCurrentInstance: UnwrapRef<typeof import('vue')['getCurrentInstance']>
     readonly getCurrentScope: UnwrapRef<typeof import('vue')['getCurrentScope']>
+    readonly getItemKey: UnwrapRef<typeof import('./composables/useClipboardManager')['getItemKey']>
     readonly h: UnwrapRef<typeof import('vue')['h']>
     readonly ignorableWatch: UnwrapRef<typeof import('@vueuse/core')['ignorableWatch']>
     readonly inject: UnwrapRef<typeof import('vue')['inject']>
@@ -419,6 +436,7 @@ declare module 'vue' {
     readonly toReactive: UnwrapRef<typeof import('@vueuse/core')['toReactive']>
     readonly toRef: UnwrapRef<typeof import('vue')['toRef']>
     readonly toRefs: UnwrapRef<typeof import('vue')['toRefs']>
+    readonly toTimestampMs: UnwrapRef<typeof import('./composables/useClipboardSections')['toTimestampMs']>
     readonly toValue: UnwrapRef<typeof import('vue')['toValue']>
     readonly toggleDark: UnwrapRef<typeof import('./composables/dark')['toggleDark']>
     readonly triggerRef: UnwrapRef<typeof import('vue')['triggerRef']>
@@ -454,8 +472,11 @@ declare module 'vue' {
     readonly useBroadcastChannel: UnwrapRef<typeof import('@vueuse/core')['useBroadcastChannel']>
     readonly useBrowserLocation: UnwrapRef<typeof import('@vueuse/core')['useBrowserLocation']>
     readonly useCached: UnwrapRef<typeof import('@vueuse/core')['useCached']>
-    readonly useClipboard: UnwrapRef<typeof import('@vueuse/core')['useClipboard']>
+    readonly useClipboard: UnwrapRef<typeof import('./composables/useClipboard')['useClipboard']>
+    readonly useClipboardFilters: UnwrapRef<typeof import('./composables/useClipboardFilters')['useClipboardFilters']>
     readonly useClipboardItems: UnwrapRef<typeof import('@vueuse/core')['useClipboardItems']>
+    readonly useClipboardManager: UnwrapRef<typeof import('./composables/useClipboardManager')['useClipboardManager']>
+    readonly useClipboardSections: UnwrapRef<typeof import('./composables/useClipboardSections')['useClipboardSections']>
     readonly useCloned: UnwrapRef<typeof import('@vueuse/core')['useCloned']>
     readonly useColorMode: UnwrapRef<typeof import('@vueuse/core')['useColorMode']>
     readonly useConfirmDialog: UnwrapRef<typeof import('@vueuse/core')['useConfirmDialog']>
