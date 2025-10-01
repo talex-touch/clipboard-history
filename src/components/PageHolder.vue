@@ -26,16 +26,16 @@ defineOptions({
 }
 
 .ClipboardPageHolder {
-  color: var(--tuff-text-color);
+  color: var(--clipboard-text-primary);
+  background: var(--clipboard-surface-base);
 }
 
-/* .ClipboardPageHolder::before {
-  z-index: -1;
-  content: '';
-  position: absolute;
+.holder-aside {
+  background: var(--clipboard-surface-subtle);
+  border-right: 1px solid var(--clipboard-border-color);
+}
 
-  inset: 0;
-  opacity: 0.25;
-  background-color: var(--tuff-bg-color);
-} */
+.holder-main {
+  background: var(--clipboard-surface-elevated);
+}
 </style>

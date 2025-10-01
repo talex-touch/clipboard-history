@@ -26,3 +26,53 @@ html.dark {
   width: 100%;
   height: 2px;
 }
+
+:root {
+  /* Accent & semantic colors */
+  --clipboard-color-accent: var(--tuff-color-primary, var(--tuff-color-info, #6366f1));
+  --clipboard-color-accent-strong: var(--tuff-color-primary-dark-2, var(--clipboard-color-accent));
+  --clipboard-color-danger: var(--tuff-color-danger, #ef4444);
+  --clipboard-color-danger-strong: var(--tuff-color-danger-dark-2, var(--clipboard-color-danger));
+
+  /* Soft color mixes fall back to static rgba for older browsers */
+  --clipboard-color-accent-soft-fallback: rgba(99, 102, 241, 0.12);
+  --clipboard-color-accent-softer-fallback: rgba(99, 102, 241, 0.08);
+  --clipboard-color-danger-soft-fallback: rgba(248, 113, 113, 0.12);
+
+  /* Typography */
+  --clipboard-text-primary: var(--tuff-text-color, #1f2937);
+  --clipboard-text-secondary: var(--tuff-text-color-secondary, #475569);
+  --clipboard-text-muted: var(--tuff-text-color-subtle, #94a3b8);
+  --clipboard-text-disabled: var(--tuff-text-color-disabled, #a1acc5);
+
+  /* Surfaces & borders */
+  --clipboard-surface-base: var(--tuff-bg-color, #ffffff);
+  --clipboard-surface-elevated: var(--tuff-surface-elevated, rgba(255, 255, 255, 0.96));
+  --clipboard-surface-subtle: var(--tuff-surface-subtle, rgba(245, 247, 252, 0.92));
+  --clipboard-surface-ghost: var(--tuff-surface-ghost, rgba(148, 163, 184, 0.12));
+  --clipboard-surface-strong: var(--tuff-surface-strong, rgba(15, 23, 42, 0.05));
+  --clipboard-border-color: var(--tuff-border-color, rgba(148, 163, 184, 0.24));
+  --clipboard-border-strong: var(--tuff-border-color-strong, rgba(148, 163, 184, 0.38));
+
+  /* Shadows */
+  --clipboard-shadow-soft: var(--tuff-box-shadow-light, 0 12px 32px rgba(15, 23, 42, 0.16));
+  --clipboard-shadow-strong: var(--tuff-box-shadow, 0 18px 38px rgba(15, 23, 42, 0.18));
+  --clipboard-shadow-ghost: var(--tuff-box-shadow-lighter, 0 8px 20px rgba(15, 23, 42, 0.12));
+}
+
+html.dark {
+  --clipboard-color-accent-soft-fallback: rgba(99, 102, 241, 0.16);
+  --clipboard-color-accent-softer-fallback: rgba(99, 102, 241, 0.1);
+  --clipboard-color-danger-soft-fallback: rgba(248, 113, 113, 0.18);
+
+  --clipboard-text-secondary: var(--tuff-text-color-secondary, #cbd5f5);
+  --clipboard-text-muted: var(--tuff-text-color-subtle, #9ca3af);
+  --clipboard-text-disabled: var(--tuff-text-color-disabled, #6b7280);
+
+  --clipboard-surface-elevated: var(--tuff-surface-elevated, rgba(17, 24, 39, 0.92));
+  --clipboard-surface-subtle: var(--tuff-surface-subtle, rgba(17, 24, 39, 0.78));
+  --clipboard-surface-ghost: var(--tuff-surface-ghost, rgba(51, 65, 85, 0.22));
+  --clipboard-surface-strong: var(--tuff-surface-strong, rgba(30, 41, 59, 0.38));
+  --clipboard-border-color: var(--tuff-border-color, rgba(100, 116, 139, 0.28));
+  --clipboard-border-strong: var(--tuff-border-color-strong, rgba(100, 116, 139, 0.38));
+}

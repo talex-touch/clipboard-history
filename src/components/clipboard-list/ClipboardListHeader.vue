@@ -29,30 +29,28 @@ function handleClear() {
 </script>
 
 <template>
-  <header class="flex items-center justify-between gap-2 text-sm">
+  <header class="header-root flex items-center justify-between gap-2 text-sm">
     <div class="header-title">
-      <p class="text-slate-700 font-medium dark:text-slate-300">
+      <p>
         {{ summaryText }}
       </p>
     </div>
     <div class="inline-flex items-center gap-2">
       <button
-        class="inline-flex cursor-pointer items-center gap-1 border border-slate-300/70 rounded-full bg-slate-50/70 px-2.5 py-1 text-xs text-slate-600 font-semibold transition dark:(border-slate-600/70 bg-slate-800/70 text-slate-300) hover:(border-indigo-400/80 bg-white) dark:hover:(border-indigo-500/80 bg-slate-800)"
-        :class="{
-          'bg-indigo-500/10 !border-indigo-500/60 text-indigo-600 dark:text-indigo-400': hasActiveFilter,
-        }"
+        class="filter-toggle inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold transition"
+        :class="{ active: hasActiveFilter }"
         type="button"
         @click="handleToggleFilter"
       >
         <span class="i-carbon-filter text-sm" aria-hidden="true" />
         {{ activeFilterLabel }}
       </button>
-      <div v-if="isLoading" class="inline-flex items-center gap-1.5 text-xs text-slate-500">
-        <span class="h-3 w-3 animate-spin border-2 border-slate-300 border-t-indigo-500 rounded-full dark:border-slate-600 dark:border-t-indigo-500" aria-hidden="true" />
+      <div v-if="isLoading" class="sync-indicator inline-flex items-center gap-1.5 text-xs">
+        <span class="spinner h-3 w-3 animate-spin border-2 rounded-full" aria-hidden="true" />
         正在同步…
       </div>
       <button
-        class="rounded-full p-1.5 text-slate-500 transition disabled:(cursor-not-allowed opacity-60) hover:(bg-slate-200/60 text-slate-700) dark:(text-slate-400) dark:hover:(bg-slate-700/60 text-slate-200)"
+        class="icon-button"
         type="button"
         :disabled="isLoading"
         @click="handleRefresh"
@@ -60,7 +58,7 @@ function handleClear() {
         <span class="i-carbon-renew block" aria-hidden="true" />
       </button>
       <button
-        class="rounded-full p-1.5 text-red-500/80 transition disabled:(cursor-not-allowed opacity-60) hover:(bg-red-500/10 text-red-500) dark:(text-red-500/90) dark:hover:(bg-red-500/20 text-red-400)"
+        class="icon-button danger"
         type="button"
         :disabled="isClearing || !hasItems"
         @click="handleClear"
@@ -70,3 +68,83 @@ function handleClear() {
     </div>
   </header>
 </template>
+
+<style scoped>
+.header-root {
+  color: var(--clipboard-text-secondary);
+}
+
+.header-title p {
+  margin: 0;
+  color: var(--clipboard-text-secondary);
+  font-weight: 600;
+}
+
+.filter-toggle {
+  border: 1px solid var(--clipboard-border-color);
+  background: var(--clipboard-surface-subtle);
+  color: var(--clipboard-text-secondary);
+}
+
+.filter-toggle:hover {
+  border-color: var(--clipboard-color-accent, #6366f1);
+  background: var(--clipboard-color-accent-softer-fallback);
+  background: color-mix(in srgb, var(--clipboard-color-accent, #6366f1) 8%, transparent);
+  color: var(--clipboard-color-accent-strong, var(--clipboard-color-accent, #6366f1));
+}
+
+.filter-toggle.active {
+  border-color: var(--clipboard-color-accent, #6366f1);
+  background: var(--clipboard-color-accent-soft-fallback);
+  background: color-mix(in srgb, var(--clipboard-color-accent, #6366f1) 14%, transparent);
+  color: var(--clipboard-color-accent-strong, var(--clipboard-color-accent, #6366f1));
+}
+
+.sync-indicator {
+  color: var(--clipboard-text-muted);
+}
+
+.sync-indicator .spinner {
+  border-color: rgba(148, 163, 184, 0.28);
+  border-color: color-mix(in srgb, var(--clipboard-text-muted, #94a3b8) 36%, transparent);
+  border-top-color: var(--clipboard-color-accent, #6366f1);
+}
+
+.icon-button {
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--clipboard-text-muted);
+  border-radius: 999px;
+  padding: 6px;
+  transition: all 0.18s ease;
+}
+
+.icon-button:hover:not(:disabled) {
+  border-color: var(--clipboard-border-color);
+  background: var(--clipboard-surface-strong);
+  color: var(--clipboard-text-secondary);
+}
+
+.icon-button:disabled {
+  opacity: 0.56;
+  cursor: not-allowed;
+}
+
+.icon-button.danger {
+  color: var(--clipboard-color-danger, #ef4444);
+}
+
+.icon-button.danger:hover:not(:disabled) {
+  border-color: var(--clipboard-color-danger, #ef4444);
+  background: var(--clipboard-color-danger-soft-fallback);
+  background: color-mix(in srgb, var(--clipboard-color-danger, #ef4444) 14%, transparent);
+}
+
+.icon-button.danger:disabled {
+  color: color-mix(in srgb, var(--clipboard-color-danger, #ef4444) 40%, transparent);
+}
+
+.icon-button span {
+  display: block;
+}
+</style>

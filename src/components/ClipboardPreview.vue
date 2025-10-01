@@ -198,6 +198,7 @@ function handleDelete() {
   padding: 28px 26px 22px;
   gap: 22px;
   box-sizing: border-box;
+  color: var(--clipboard-text-primary);
 }
 
 .preview-header {
@@ -218,12 +219,18 @@ function handleDelete() {
   width: 52px;
   height: 52px;
   border-radius: 18px;
-  background: linear-gradient(145deg, rgba(99, 102, 241, 0.18), rgba(79, 70, 229, 0.32));
+  background: var(--clipboard-color-accent-soft-fallback);
+  background: linear-gradient(
+    145deg,
+    color-mix(in srgb, var(--clipboard-color-accent, #6366f1) 24%, transparent),
+    color-mix(in srgb, var(--clipboard-color-accent, #6366f1) 38%, transparent)
+  );
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.4);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, #ffffff 40%, transparent);
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #4f46e5;
+  color: var(--clipboard-color-accent-strong, var(--clipboard-color-accent, #6366f1));
   font-size: 1.6rem;
 }
 
@@ -235,7 +242,7 @@ function handleDelete() {
   margin: 0;
   font-size: 1.3rem;
   font-weight: 600;
-  color: #111827;
+  color: var(--clipboard-text-primary);
 }
 
 .subtitle {
@@ -244,7 +251,11 @@ function handleDelete() {
   gap: 6px;
   margin: 6px 0 0;
   font-size: 0.85rem;
-  color: #64748b;
+  color: var(--clipboard-text-muted);
+}
+
+.subtitle span[aria-hidden='true'] {
+  color: inherit;
 }
 
 .header-actions {
@@ -259,44 +270,58 @@ function handleDelete() {
   gap: 8px;
   padding: 10px 16px;
   border-radius: 999px;
-  border: 1px solid rgba(148, 163, 184, 0.32);
-  background: rgba(255, 255, 255, 0.9);
-  color: #475569;
+  border: 1px solid var(--clipboard-border-color);
+  background: var(--clipboard-surface-subtle);
+  color: var(--clipboard-text-secondary);
   font-weight: 600;
   cursor: pointer;
   transition: all 0.18s ease;
 }
 
 .action-button:hover:not(:disabled) {
-  background: #ffffff;
-  border-color: rgba(99, 102, 241, 0.45);
-  box-shadow: 0 10px 24px rgba(79, 70, 229, 0.16);
+  border-color: var(--clipboard-color-accent, #6366f1);
+  background: var(--clipboard-color-accent-soft-fallback);
+  background: color-mix(in srgb, var(--clipboard-color-accent, #6366f1) 14%, transparent);
+  color: var(--clipboard-color-accent-strong, var(--clipboard-color-accent, #6366f1));
+  box-shadow: var(--clipboard-shadow-ghost);
 }
 
 .action-button.danger {
-  color: #dc2626;
+  color: var(--clipboard-color-danger, #ef4444);
   border-color: rgba(239, 68, 68, 0.35);
+  border-color: color-mix(in srgb, var(--clipboard-color-danger, #ef4444) 35%, transparent);
 }
 
 .action-button.danger:hover:not(:disabled) {
-  border-color: rgba(239, 68, 68, 0.55);
-  box-shadow: 0 10px 24px rgba(239, 68, 68, 0.16);
+  border-color: var(--clipboard-color-danger, #ef4444);
+  background: var(--clipboard-color-danger-soft-fallback);
+  background: color-mix(in srgb, var(--clipboard-color-danger, #ef4444) 16%, transparent);
+  box-shadow: var(--clipboard-shadow-ghost);
 }
 
 .action-button:disabled {
-  opacity: 0.6;
+  opacity: 0.65;
   cursor: not-allowed;
+  color: var(--clipboard-text-disabled);
+  border-color: rgba(148, 163, 184, 0.26);
+  border-color: color-mix(in srgb, var(--clipboard-border-color, rgba(148, 163, 184, 0.24)) 60%, transparent);
 }
 
 .preview-surface {
   position: relative;
   flex: 1;
   border-radius: 22px;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(245, 247, 252, 0.92));
-  border: 1px solid rgba(148, 163, 184, 0.22);
+  background: var(--clipboard-surface-elevated);
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--clipboard-surface-elevated, rgba(255, 255, 255, 0.96)) 96%, transparent),
+    color-mix(in srgb, var(--clipboard-surface-subtle, rgba(245, 247, 252, 0.92)) 92%, transparent)
+  );
+  border: 1px solid var(--clipboard-border-color);
   padding: 24px;
   overflow-y: auto;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.65);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, #ffffff 65%, transparent);
 }
 
 .preview-empty {
@@ -306,18 +331,23 @@ function handleDelete() {
   align-items: center;
   justify-content: center;
   gap: 14px;
-  color: #94a3b8;
+  color: var(--clipboard-text-muted);
 }
 
 .preview-empty .empty-icon {
   width: 64px;
   height: 64px;
   border-radius: 20px;
-  background: linear-gradient(150deg, rgba(148, 163, 184, 0.16), rgba(148, 163, 184, 0.3));
+  background: var(--clipboard-surface-ghost);
+  background: linear-gradient(
+    150deg,
+    color-mix(in srgb, var(--clipboard-surface-ghost, rgba(148, 163, 184, 0.16)) 65%, transparent),
+    color-mix(in srgb, var(--clipboard-surface-ghost, rgba(148, 163, 184, 0.16)) 92%, transparent)
+  );
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  color: #94a3b8;
+  color: var(--clipboard-text-muted);
   font-size: 1.6rem;
 }
 
@@ -331,8 +361,9 @@ function handleDelete() {
   margin: 0;
   padding: 16px;
   border-radius: 16px;
-  background: rgba(15, 23, 42, 0.05);
-  color: #1f2937;
+  background: var(--clipboard-surface-strong);
+  border: 1px solid var(--clipboard-border-color);
+  color: var(--clipboard-text-primary);
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Courier New', monospace;
   white-space: pre-wrap;
   word-break: break-word;
@@ -346,7 +377,7 @@ function handleDelete() {
 .preview-block.image img {
   max-width: 100%;
   border-radius: 20px;
-  box-shadow: 0 18px 42px rgba(15, 23, 42, 0.18);
+  box-shadow: var(--clipboard-shadow-strong);
 }
 
 .preview-block.files ul {
@@ -364,16 +395,18 @@ function handleDelete() {
   gap: 10px;
   padding: 12px 14px;
   border-radius: 14px;
-  background: rgba(148, 163, 184, 0.12);
-  color: #334155;
+  background: var(--clipboard-surface-ghost);
+  border: 1px solid var(--clipboard-border-color);
+  color: var(--clipboard-text-secondary);
 }
 
 .preview-block.files pre {
   margin: 0;
   padding: 14px;
   border-radius: 14px;
-  background: rgba(15, 23, 42, 0.05);
-  color: #1f2937;
+  background: var(--clipboard-surface-strong);
+  border: 1px solid var(--clipboard-border-color);
+  color: var(--clipboard-text-primary);
   font-size: 0.9rem;
   white-space: pre-wrap;
   word-break: break-word;
@@ -391,8 +424,9 @@ function handleDelete() {
   gap: 6px;
   padding: 14px;
   border-radius: 18px;
-  background: rgba(148, 163, 184, 0.12);
-  color: #1f2937;
+  background: var(--clipboard-surface-ghost);
+  border: 1px solid var(--clipboard-border-color);
+  color: var(--clipboard-text-primary);
 }
 
 .info-row dt {
@@ -403,7 +437,7 @@ function handleDelete() {
   font-size: 0.78rem;
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  color: #64748b;
+  color: var(--clipboard-text-muted);
 }
 
 .info-row dd {
@@ -417,7 +451,8 @@ function handleDelete() {
 }
 
 .preview-surface::-webkit-scrollbar-thumb {
-  background: rgba(148, 163, 184, 0.45);
+  background: var(--clipboard-border-strong);
+  background: color-mix(in srgb, var(--clipboard-border-strong, rgba(148, 163, 184, 0.45)) 96%, transparent);
   border-radius: 999px;
 }
 

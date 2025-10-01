@@ -58,9 +58,9 @@ function handleSelect(item: FilterMenuItem) {
   min-width: 188px;
   padding: 12px;
   border-radius: 14px;
-  border: 1px solid rgba(148, 163, 184, 0.28);
-  background: rgba(255, 255, 255, 0.94);
-  box-shadow: 0 18px 38px rgba(15, 23, 42, 0.16);
+  border: 1px solid var(--clipboard-border-color);
+  background: var(--clipboard-surface-elevated);
+  box-shadow: var(--clipboard-shadow-strong);
   z-index: 20;
 }
 
@@ -73,24 +73,26 @@ function handleSelect(item: FilterMenuItem) {
   border-radius: 12px;
   border: 1px solid transparent;
   background: transparent;
-  color: #475569;
+  color: var(--clipboard-text-secondary);
   font-size: 0.82rem;
   cursor: pointer;
   transition: all 0.18s ease;
 }
 
 .filter-option:hover {
-  background: rgba(99, 102, 241, 0.08);
+  background: var(--clipboard-color-accent-softer-fallback);
+  background: color-mix(in srgb, var(--clipboard-color-accent, #6366f1) 10%, transparent);
 }
 
 .filter-option.active {
-  border-color: rgba(99, 102, 241, 0.45);
-  background: rgba(99, 102, 241, 0.12);
-  color: #4f46e5;
+  border-color: var(--clipboard-color-accent, #6366f1);
+  background: var(--clipboard-color-accent-soft-fallback);
+  background: color-mix(in srgb, var(--clipboard-color-accent, #6366f1) 14%, transparent);
+  color: var(--clipboard-color-accent-strong, var(--clipboard-color-accent, #6366f1));
 }
 
 .filter-option.muted {
-  color: #9ca3af;
+  color: var(--clipboard-text-disabled);
 }
 
 .filter-option:disabled {
@@ -112,6 +114,6 @@ function handleSelect(item: FilterMenuItem) {
 
 .option-count {
   font-variant-numeric: tabular-nums;
-  color: #94a3b8;
+  color: var(--clipboard-text-muted);
 }
 </style>

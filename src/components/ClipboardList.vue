@@ -132,33 +132,33 @@ function toggleFilterPanel() {
     tabindex="0"
     :aria-activedescendant="selectedKey ? `clipboard-item-${selectedKey}` : undefined"
   >
-    <div ref="filterControlsRef" class="px-2">
-      <ClipboardListHeader
-        :summary-text="summaryText"
-        :is-loading="isLoading"
-        :active-filter-label="activeFilterLabel"
-        :has-active-filter="filterState.hasActiveFilter.value"
-        :is-clearing="isClearing"
-        :has-items="hasItems"
-        @toggle-filter="toggleFilterPanel"
-        @refresh="handleRefresh"
-        @clear="handleClear"
-      />
-
-      <ClipboardListFilterPanel
-        v-if="filterState.isPanelOpen.value"
-        :items="filterState.filterMenuItems.value"
-        :selected="filterState.selectedFilter.value"
-        @select="handleFilterChange"
-      />
-    </div>
-
     <div v-if="errorMessage" class="list-error" role="alert">
       <span class="i-carbon-warning" aria-hidden="true" />
       <span>{{ errorMessage }}</span>
     </div>
 
-    <div ref="scrollAreaRef" class="h-full overflow-y-auto" tabindex="-1">
+    <div ref="scrollAreaRef" class="h-full overflow-y-auto px-2" tabindex="-1">
+      <div ref="filterControlsRef" class="relative pb-3">
+        <ClipboardListHeader
+          :summary-text="summaryText"
+          :is-loading="isLoading"
+          :active-filter-label="activeFilterLabel"
+          :has-active-filter="filterState.hasActiveFilter.value"
+          :is-clearing="isClearing"
+          :has-items="hasItems"
+          @toggle-filter="toggleFilterPanel"
+          @refresh="handleRefresh"
+          @clear="handleClear"
+        />
+
+        <ClipboardListFilterPanel
+          v-if="filterState.isPanelOpen.value"
+          :items="filterState.filterMenuItems.value"
+          :selected="filterState.selectedFilter.value"
+          @select="handleFilterChange"
+        />
+      </div>
+
       <template v-if="hasItems">
         <ClipboardSection
           v-for="section in groupedSections"
@@ -196,8 +196,11 @@ function toggleFilterPanel() {
   gap: 8px;
   padding: 10px 14px;
   border-radius: 16px;
-  background: rgba(248, 113, 113, 0.12);
-  color: #b91c1c;
+  border: 1px solid var(--clipboard-border-strong);
+  background: var(--clipboard-color-danger-soft-fallback);
+  background: color-mix(in srgb, var(--clipboard-color-danger, #ef4444) 14%, transparent);
+  color: var(--clipboard-color-danger-strong, #b91c1c);
+  box-shadow: var(--clipboard-shadow-ghost);
   font-size: 0.82rem;
 }
 </style>

@@ -49,14 +49,13 @@ function handleSelect() {
     @click="handleSelect"
   >
     <div
-      class="h-4 w-4 flex items-center justify-center rounded-xl text-lg transition-colors"
+      class="item-icon h-4 w-4 flex items-center justify-center rounded-xl text-lg transition-colors"
       :class="[iconClass]"
       aria-hidden="true"
     />
     <div class="min-w-0 flex flex-col gap-1.5">
       <p
-        class="truncate font-semibold"
-        :class="isActive ? 'text-indigo-900' : 'text-slate-800'"
+        class="item-title truncate font-semibold"
         :title="item.content || '（无内容）'"
       >
         {{ item.content || '（无内容）' }}
@@ -67,12 +66,39 @@ function handleSelect() {
 
 <style scoped>
 .ClipboardItem {
+  border: 1px solid transparent;
+  background: transparent;
   &.active {
-    background-color: var(--tuff-bg-color);
+    border-color: var(--clipboard-border-strong);
+    background: var(--clipboard-color-accent-soft-fallback);
+    background: color-mix(in srgb, var(--clipboard-color-accent, #6366f1) 14%, transparent);
+    box-shadow: var(--clipboard-shadow-ghost);
   }
 
   &:hover {
-    background-color: var(--tuff-bg-color);
+    border-color: var(--clipboard-border-color);
+    background: var(--clipboard-surface-strong);
   }
+
+  &:focus-visible {
+    outline: 2px solid var(--clipboard-color-accent, #6366f1);
+    outline-offset: 2px;
+  }
+}
+
+.ClipboardItem .item-icon {
+  color: var(--clipboard-text-muted);
+}
+
+.ClipboardItem.active .item-icon {
+  color: var(--clipboard-color-accent-strong, var(--clipboard-color-accent, #6366f1));
+}
+
+.ClipboardItem .item-title {
+  color: var(--clipboard-text-primary);
+}
+
+.ClipboardItem.active .item-title {
+  color: var(--clipboard-color-accent-strong, var(--clipboard-color-accent, #6366f1));
 }
 </style>

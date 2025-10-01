@@ -22,7 +22,7 @@ defineProps<{
 .list-empty {
   margin: 0 auto;
   text-align: center;
-  color: #94a3b8;
+  color: var(--clipboard-text-muted);
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -34,17 +34,22 @@ defineProps<{
   height: 54px;
   border-radius: 16px;
   margin: 0 auto;
-  background: linear-gradient(145deg, rgba(148, 163, 184, 0.1), rgba(148, 163, 184, 0.2));
+  background: var(--clipboard-surface-ghost);
+  background: linear-gradient(
+    145deg,
+    color-mix(in srgb, var(--clipboard-surface-ghost, rgba(148, 163, 184, 0.12)) 60%, transparent),
+    color-mix(in srgb, var(--clipboard-surface-ghost, rgba(148, 163, 184, 0.12)) 90%, transparent)
+  );
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  color: #94a3b8;
+  color: var(--clipboard-text-muted);
   font-size: 1.3rem;
 }
 
 .empty-hint {
   font-size: 0.78rem;
-  color: #a1acc5;
+  color: var(--clipboard-text-disabled);
   margin: 0;
 }
 </style>

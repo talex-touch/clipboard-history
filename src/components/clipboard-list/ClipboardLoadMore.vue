@@ -33,25 +33,29 @@ function handleClick() {
   align-self: center;
   padding: 8px 16px;
   border-radius: 999px;
-  border: 1px solid rgba(148, 163, 184, 0.3);
-  background: rgba(255, 255, 255, 0.75);
+  border: 1px solid var(--clipboard-border-color);
+  background: var(--clipboard-surface-subtle);
   display: inline-flex;
   align-items: center;
   gap: 8px;
   font-size: 0.85rem;
+  color: var(--clipboard-text-secondary);
   cursor: pointer;
   transition: all 0.18s ease;
 }
 
 .ghost-button.load-more:hover:not(:disabled) {
-  background: #ffffff;
-  border-color: rgba(99, 102, 241, 0.4);
-  box-shadow: 0 8px 16px rgba(79, 70, 229, 0.18);
+  border-color: var(--clipboard-color-accent, #6366f1);
+  background: var(--clipboard-color-accent-soft-fallback);
+  background: color-mix(in srgb, var(--clipboard-color-accent, #6366f1) 12%, transparent);
+  color: var(--clipboard-color-accent-strong, var(--clipboard-color-accent, #6366f1));
+  box-shadow: var(--clipboard-shadow-ghost);
 }
 
 .ghost-button.load-more:disabled {
   opacity: 0.6;
   cursor: not-allowed;
+  color: var(--clipboard-text-disabled);
 }
 
 .ghost-button.load-more span[aria-hidden='true'] {
