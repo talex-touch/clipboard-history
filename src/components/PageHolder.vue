@@ -5,7 +5,7 @@ defineOptions({
 </script>
 
 <template>
-  <div class="clipboard-page-holder absolute left-0 top-0 h-full w-full flex overflow-hidden">
+  <div class="ClipboardPageHolder fake-background absolute left-0 top-0 h-full w-full flex overflow-hidden">
     <aside class="holder-aside w-[40%]" role="complementary">
       <slot name="aside" />
     </aside>
@@ -24,4 +24,18 @@ defineOptions({
   overflow: hidden;
   flex-direction: column;
 }
+
+.ClipboardPageHolder {
+  color: var(--tuff-text-color);
+}
+
+/* .ClipboardPageHolder::before {
+  z-index: -1;
+  content: '';
+  position: absolute;
+
+  inset: 0;
+  opacity: 0.25;
+  background-color: var(--tuff-bg-color);
+} */
 </style>

@@ -71,12 +71,6 @@ const {
   </PageHolder>
 </template>
 
-<style scoped>
-:global(body) {
-  background: #eef1f7;
-}
-</style>
-
 <route lang="yaml">
 meta:
   layout: default
