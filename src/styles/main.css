@@ -40,7 +40,7 @@ html.dark {
   --clipboard-color-danger-soft-fallback: rgba(248, 113, 113, 0.12);
 
   /* Typography */
-  --clipboard-text-primary: var(--tuff-text-color, #1f2937);
+  --clipboard-text-primary: var(--tuff-text-color-primary, #1f2937);
   --clipboard-text-secondary: var(--tuff-text-color-secondary, #475569);
   --clipboard-text-muted: var(--tuff-text-color-subtle, #94a3b8);
   --clipboard-text-disabled: var(--tuff-text-color-disabled, #a1acc5);

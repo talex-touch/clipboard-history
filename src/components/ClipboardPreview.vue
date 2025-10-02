@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { PluginClipboardItem } from '@talex-touch/utils/plugin/sdk/types'
 import { computed } from 'vue'
+import { useClipboardContentInfo } from '~/composables/useClipboardContentInfo'
 
 const props = defineProps<{
   item: PluginClipboardItem | null
@@ -20,47 +21,22 @@ interface InfoRow {
   icon: string
 }
 
-const typeIconMap: Record<string, string> = {
-  text: 'i-carbon-text-align-left',
-  image: 'i-carbon-image',
-  html: 'i-carbon-code',
-  richtext: 'i-carbon-text-style',
-  files: 'i-carbon-document',
-  file: 'i-carbon-document',
-  url: 'i-carbon-link',
-  application: 'i-carbon-application-web',
-}
+const contentInfo = useClipboardContentInfo(
+  () => props.item?.content ?? '',
+  {
+    baseType: () => props.item?.type,
+    rawContent: () => props.item?.rawContent,
+  },
+)
 
-const currentIcon = computed(() => {
-  if (!props.item?.type)
-    return 'i-carbon-clipboard'
-  return typeIconMap[props.item.type] ?? 'i-carbon-clipboard'
-})
-
-const typeLabel = computed(() => {
-  const type = props.item?.type
-  if (!type)
-    return '未知类型'
-  switch (type) {
-    case 'text':
-      return '文本'
-    case 'image':
-      return '图片'
-    case 'files':
-    case 'file':
-      return '文件'
-    case 'html':
-      return 'HTML'
-    case 'richtext':
-      return '富文本'
-    case 'url':
-      return '链接'
-    case 'application':
-      return '应用数据'
-    default:
-      return type
-  }
-})
+const primaryType = computed(() => (props.item?.type ?? '') as string)
+const derivedType = computed(() => props.item ? contentInfo.value.type : 'empty')
+const currentIcon = computed(() => (props.item ? contentInfo.value.icon : 'i-carbon-clipboard'))
+const typeLabel = computed(() => (props.item ? contentInfo.value.label : '未知类型'))
+const colorSwatch = computed(() => (props.item ? contentInfo.value.colorSwatch : undefined))
+const hrefValue = computed(() => (props.item ? contentInfo.value.href : undefined))
+const previewPrimaryText = computed(() => (props.item ? contentInfo.value.previewText : ''))
+const previewSecondaryText = computed(() => (props.item ? contentInfo.value.secondaryText : undefined))
 
 const timestampText = computed(() => props.item ? props.formatTimestamp(props.item.timestamp) : '')
 
@@ -80,6 +56,9 @@ const infoRows = computed(() => {
   if (props.item.id !== undefined && props.item.id !== null)
     rows.push({ label: '标识符', value: String(props.item.id), icon: 'i-carbon-hash' })
 
+  if (contentInfo.value.meta.length)
+    contentInfo.value.meta.forEach(meta => rows.push({ label: meta.label, value: meta.value, icon: 'i-carbon-information' }))
+
   return rows
 })
 
@@ -95,6 +74,30 @@ const fileList = computed(() => {
 })
 
 const previewText = computed(() => props.item?.content ?? '')
+const imageSrc = computed(() => {
+  if (!props.item)
+    return ''
+  if (props.item.thumbnail)
+    return props.item.thumbnail
+  if (primaryType.value === 'image')
+    return props.item.content
+  if (contentInfo.value.type === 'data-url-image')
+    return props.item.content
+  return ''
+})
+
+const linkHref = computed(() => {
+  if (!props.item)
+    return undefined
+  if (hrefValue.value)
+    return hrefValue.value
+
+  if (contentInfo.value.type === 'email')
+    return `mailto:${contentInfo.value.previewText}`
+  if (contentInfo.value.type === 'phone')
+    return `tel:${contentInfo.value.previewText.replace(/\D/g, '')}`
+  return undefined
+})
 
 function handleToggleFavorite() {
   emit('toggleFavorite')
@@ -156,13 +159,21 @@ function handleDelete() {
         <p>在左侧选择一个剪贴记录以查看详情</p>
       </div>
       <template v-else>
-        <div v-if="item.type === 'text' || item.type === 'html' || item.type === 'richtext'" class="preview-block text">
-          <pre>{{ previewText }}</pre>
+        <div v-if="derivedType === 'color'" class="preview-block color">
+          <div class="color-sample" :style="{ background: colorSwatch || previewPrimaryText }" aria-hidden="true" />
+          <div class="color-details">
+            <p class="color-value">
+              {{ previewPrimaryText }}
+            </p>
+            <p v-if="previewSecondaryText" class="color-secondary">
+              {{ previewSecondaryText }}
+            </p>
+          </div>
         </div>
-        <div v-else-if="item.type === 'image'" class="preview-block image">
-          <img :src="item.thumbnail || item.content" alt="剪贴图片预览">
+        <div v-else-if="derivedType === 'data-url-image' || primaryType === 'image'" class="preview-block image">
+          <img :src="imageSrc || item.content" alt="剪贴图片预览">
         </div>
-        <div v-else-if="item.type === 'files' || item.type === 'file'" class="preview-block files">
+        <div v-else-if="['files', 'file'].includes(primaryType) || derivedType === 'file-uri' || derivedType === 'file-path' || derivedType === 'folder-path'" class="preview-block files">
           <ul>
             <li v-for="(file, index) in fileList" :key="index">
               <span class="i-carbon-document" aria-hidden="true" />
@@ -171,8 +182,27 @@ function handleDelete() {
           </ul>
           <pre v-if="!fileList.length">{{ item.rawContent ?? item.content }}</pre>
         </div>
+        <div v-else-if="derivedType === 'url' || derivedType === 'email' || derivedType === 'email-link' || derivedType === 'phone'" class="preview-block link">
+          <a
+            v-if="linkHref"
+            :href="linkHref"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            {{ previewPrimaryText }}
+          </a>
+          <p v-else>
+            {{ previewPrimaryText }}
+          </p>
+          <p v-if="previewSecondaryText" class="link-secondary">
+            {{ previewSecondaryText }}
+          </p>
+        </div>
         <div v-else class="preview-block text">
           <pre>{{ previewText }}</pre>
+          <p v-if="previewSecondaryText" class="preview-hint">
+            {{ previewSecondaryText }}
+          </p>
         </div>
       </template>
     </div>
@@ -357,6 +387,38 @@ function handleDelete() {
   gap: 16px;
 }
 
+.preview-block.color {
+  flex-direction: row;
+  align-items: center;
+  gap: 24px;
+}
+
+.preview-block.color .color-sample {
+  width: 140px;
+  height: 140px;
+  border-radius: 28px;
+  border: 1px solid color-mix(in srgb, var(--clipboard-border-color) 68%, transparent);
+  box-shadow: var(--clipboard-shadow-strong);
+}
+
+.preview-block.color .color-details {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.preview-block.color .color-value {
+  margin: 0;
+  font-size: 1.3rem;
+  font-weight: 600;
+  color: var(--clipboard-text-primary);
+}
+
+.preview-block.color .color-secondary {
+  margin: 0;
+  color: var(--clipboard-text-muted);
+}
+
 .preview-block.text pre {
   margin: 0;
   padding: 16px;
@@ -378,6 +440,30 @@ function handleDelete() {
   max-width: 100%;
   border-radius: 20px;
   box-shadow: var(--clipboard-shadow-strong);
+}
+
+.preview-block.link {
+  gap: 10px;
+}
+
+.preview-block.link a {
+  color: var(--clipboard-color-accent-strong, var(--clipboard-color-accent, #6366f1));
+  font-weight: 600;
+  word-break: break-all;
+}
+
+.preview-block.link p {
+  margin: 0;
+}
+
+.preview-block.link .link-secondary {
+  color: var(--clipboard-text-muted);
+}
+
+.preview-block.text .preview-hint {
+  margin: 0;
+  color: var(--clipboard-text-muted);
+  font-size: 0.85rem;
 }
 
 .preview-block.files ul {

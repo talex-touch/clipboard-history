@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { PluginClipboardItem } from '@talex-touch/utils/plugin/sdk/types'
 import { computed } from 'vue'
+import { useClipboardContentInfo } from '~/composables/useClipboardContentInfo'
 import { getItemKey } from '~/composables/useClipboardManager'
 
 const props = defineProps<{
@@ -13,25 +14,19 @@ const emit = defineEmits<{
   (event: 'select', item: PluginClipboardItem): void
 }>()
 
-const typeIconMap: Record<string, string> = {
-  text: 'i-carbon-text-align-left',
-  image: 'i-carbon-image',
-  html: 'i-carbon-code',
-  richtext: 'i-carbon-text-style',
-  files: 'i-carbon-document',
-  file: 'i-carbon-document',
-  url: 'i-carbon-link',
-  application: 'i-carbon-application-web',
-}
-
 const itemKey = computed(() => getItemKey(props.item))
-const iconClass = computed(() => resolveTypeIcon(props.item.type))
+const itemInfo = useClipboardContentInfo(
+  () => props.item.content,
+  {
+    baseType: () => props.item.type,
+    rawContent: () => props.item.rawContent,
+    maxPreviewLength: 80,
+  },
+)
 
-function resolveTypeIcon(type?: PluginClipboardItem['type']) {
-  if (!type)
-    return 'i-carbon-clipboard'
-  return typeIconMap[type] ?? 'i-carbon-clipboard'
-}
+const iconClass = computed(() => itemInfo.value.icon)
+const previewText = computed(() => itemInfo.value.previewText)
+const colorSwatch = computed(() => itemInfo.value.colorSwatch)
 
 function handleSelect() {
   emit('select', props.item)
@@ -48,17 +43,13 @@ function handleSelect() {
     :class="{ active: isActive }"
     @click="handleSelect"
   >
-    <div
-      class="item-icon h-4 w-4 flex items-center justify-center rounded-xl text-lg transition-colors"
-      :class="[iconClass]"
-      aria-hidden="true"
-    />
-    <div class="min-w-0 flex flex-col gap-1.5">
-      <p
-        class="item-title truncate font-semibold"
-        :title="item.content || '（无内容）'"
-      >
-        {{ item.content || '（无内容）' }}
+    <div class="item-icon h-7 w-7 flex items-center justify-center rounded-xl text-lg transition-colors" aria-hidden="true">
+      <span :class="iconClass" class="icon" />
+      <span v-if="colorSwatch" class="color-chip" :style="{ background: colorSwatch }" />
+    </div>
+    <div class="item-body min-w-0 flex flex-col gap-1">
+      <p class="item-preview truncate text-sm" :title="previewText">
+        {{ previewText }}
       </p>
     </div>
   </li>
@@ -68,15 +59,18 @@ function handleSelect() {
 .ClipboardItem {
   border: 1px solid transparent;
   background: transparent;
-  &.active {
+
+  &:hover {
+    cursor: pointer;
+    /* border-color: var(--clipboard-border-color); */
+    background: var(--clipboard-surface-strong);
+  }
+
+  &.active,
+  &.active:hover {
     border-color: var(--clipboard-border-strong);
     background: var(--clipboard-color-accent-soft-fallback);
     background: color-mix(in srgb, var(--clipboard-color-accent, #6366f1) 14%, transparent);
-  }
-
-  &:hover {
-    border-color: var(--clipboard-border-color);
-    background: var(--clipboard-surface-strong);
   }
 
   &:focus-visible {
@@ -87,17 +81,43 @@ function handleSelect() {
 
 .ClipboardItem .item-icon {
   color: var(--clipboard-text-muted);
+  position: relative;
 }
 
 .ClipboardItem.active .item-icon {
   color: var(--clipboard-color-accent-strong, var(--clipboard-color-accent, #6366f1));
 }
 
-.ClipboardItem .item-title {
+.ClipboardItem .item-icon .icon {
+  display: inline-flex;
+  width: 1.2em;
+  height: 1.2em;
+}
+
+.ClipboardItem .item-icon .color-chip {
+  position: absolute;
+
+  top: 50%;
+  left: 50%;
+
+  width: 12px;
+  height: 12px;
+
+  border-radius: 999px;
+  transform: translate(-50%, -50%);
+  border: 2px solid var(--clipboard-surface-strong);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--clipboard-text-muted) 24%, transparent);
+}
+
+.ClipboardItem .item-preview {
   color: var(--clipboard-text-primary);
 }
 
-.ClipboardItem.active .item-title {
-  color: var(--clipboard-color-accent-strong, var(--clipboard-color-accent, #6366f1));
+.ClipboardItem.active .item-preview {
+  color: var(--clipboard-text-primary, var(--clipboard-color-accent, #6366f1));
+}
+
+.ClipboardItem .item-preview {
+  color: var(--clipboard-text-muted);
 }
 </style>
