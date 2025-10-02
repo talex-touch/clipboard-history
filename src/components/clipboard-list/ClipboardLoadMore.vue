@@ -96,7 +96,7 @@ onBeforeUnmount(() => {
   <div
     v-if="canLoadMore && !isLoading"
     ref="sentinelRef"
-    class="load-more"
+    class="load-more w-full"
     role="status"
     :aria-busy="isLoadingMore ? 'true' : 'false'"
   >

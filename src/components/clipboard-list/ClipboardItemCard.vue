@@ -44,7 +44,7 @@ function handleSelect() {
     :data-item-id="itemKey"
     role="option"
     :aria-selected="isActive"
-    class="ClipboardItem grid grid-cols-[auto_1fr] cursor-pointer items-center gap-4 rounded-2xl px-4 py-3 transition-all duration-180 ease"
+    class="ClipboardItem grid grid-cols-[auto_1fr] cursor-pointer items-center gap-2 rounded-2xl px-2 py-2 transition-all duration-180 ease"
     :class="{ active: isActive }"
     @click="handleSelect"
   >
@@ -72,7 +72,6 @@ function handleSelect() {
     border-color: var(--clipboard-border-strong);
     background: var(--clipboard-color-accent-soft-fallback);
     background: color-mix(in srgb, var(--clipboard-color-accent, #6366f1) 14%, transparent);
-    box-shadow: var(--clipboard-shadow-ghost);
   }
 
   &:hover {
