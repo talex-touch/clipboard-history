@@ -12,6 +12,7 @@ import {
 interface LoadHistoryOptions {
   reset?: boolean
   showInitialSpinner?: boolean
+  ensureSelectionVisible?: boolean
 }
 
 function getItemKey(item: PluginClipboardItem) {
@@ -205,7 +206,11 @@ export function useClipboardManager() {
   }
 
   async function loadHistory(options: LoadHistoryOptions = {}) {
-    const { reset = false, showInitialSpinner = false } = options
+    const {
+      reset = false,
+      showInitialSpinner = false,
+      ensureSelectionVisible = true,
+    } = options
 
     if (showInitialSpinner || reset)
       errorMessage.value = null
@@ -233,7 +238,8 @@ export function useClipboardManager() {
 
       clipboardItems.value = reset ? history : mergeHistory(clipboardItems.value, history)
 
-      ensureSelection()
+      if (ensureSelectionVisible)
+        ensureSelection()
     }
     catch (error) {
       errorMessage.value = formatError(error)
@@ -251,7 +257,7 @@ export function useClipboardManager() {
   }
 
   async function loadMore() {
-    await loadHistory({ reset: false })
+    await loadHistory({ reset: false, ensureSelectionVisible: false })
   }
 
   async function toggleFavorite() {

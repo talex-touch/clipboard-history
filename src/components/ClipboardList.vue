@@ -110,8 +110,6 @@ function handleClear() {
 
 function handleLoadMore() {
   emit('loadMore')
-  if (scrollAreaRef.value)
-    scrollAreaRef.value.scrollTop = scrollAreaRef.value.scrollHeight
 }
 
 function handleFilterChange(value: FilterValue) {
@@ -137,8 +135,8 @@ function toggleFilterPanel() {
       <span>{{ errorMessage }}</span>
     </div>
 
-    <div ref="scrollAreaRef" class="h-full overflow-y-auto px-2" tabindex="-1">
-      <div ref="filterControlsRef" class="relative pb-3">
+    <div ref="scrollAreaRef" class="h-full overflow-y-auto" tabindex="-1">
+      <div ref="filterControlsRef" class="relative px-2 pb-3">
         <ClipboardListHeader
           :summary-text="summaryText"
           :is-loading="isLoading"
