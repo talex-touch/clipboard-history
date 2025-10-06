@@ -62,15 +62,40 @@ const infoRows = computed(() => {
   return rows
 })
 
+function parseFileListFromString(value: string | null | undefined): string[] {
+  if (!value)
+    return []
+  const trimmed = value.trim()
+  if (!trimmed)
+    return []
+
+  if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
+    try {
+      const parsed = JSON.parse(trimmed)
+      if (Array.isArray(parsed))
+        return parsed.map(entry => String(entry).trim()).filter(Boolean)
+    }
+    catch {
+      // ignore JSON parse failure and fall back to delimiter parsing
+    }
+  }
+
+  return trimmed.split(/[\n;]+/).map(part => part.trim()).filter(Boolean)
+}
+
 const fileList = computed(() => {
   if (!props.item)
     return []
+
   const raw = props.item.rawContent
   if (Array.isArray(raw))
-    return raw.map(String)
-  if (typeof raw === 'string')
-    return raw.split(/\n|;/).map(line => line.trim()).filter(Boolean)
-  return []
+    return raw.map(entry => String(entry).trim()).filter(Boolean)
+
+  const fromRaw = typeof raw === 'string' ? parseFileListFromString(raw) : []
+  if (fromRaw.length)
+    return fromRaw
+
+  return parseFileListFromString(props.item.content)
 })
 
 const previewText = computed(() => props.item?.content ?? '')

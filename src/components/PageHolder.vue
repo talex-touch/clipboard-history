@@ -31,11 +31,6 @@ defineOptions({
 }
 
 .holder-aside {
-  background: var(--clipboard-surface-subtle);
   border-right: 1px solid var(--clipboard-border-color);
-}
-
-.holder-main {
-  background: var(--clipboard-surface-elevated);
 }
 </style>

@@ -47,10 +47,23 @@ html.dark {
 
   /* Surfaces & borders */
   --clipboard-surface-base: var(--tuff-bg-color, #ffffff);
-  --clipboard-surface-elevated: var(--tuff-surface-elevated, rgba(255, 255, 255, 0.96));
-  --clipboard-surface-subtle: var(--tuff-surface-subtle, rgba(245, 247, 252, 0.92));
-  --clipboard-surface-ghost: var(--tuff-surface-ghost, rgba(148, 163, 184, 0.12));
-  --clipboard-surface-strong: var(--tuff-surface-strong, rgba(15, 23, 42, 0.05));
+  --clipboard-surface-elevated: var(
+    --tuff-fill-color,
+    color-mix(in srgb, var(--tuff-bg-color, #ffffff) 92%, var(--tuff-color-white, #ffffff) 8%)
+  );
+  --clipboard-surface-subtle: var(
+    --tuff-fill-color-light,
+    color-mix(in srgb, var(--tuff-bg-color, #ffffff) 88%, var(--tuff-color-white, #ffffff) 12%)
+  );
+  --clipboard-surface-ghost: var(
+    --tuff-fill-color-extra-light,
+    color-mix(in srgb, var(--tuff-bg-color, #ffffff) 84%, rgba(148, 163, 184, 0.16) 16%)
+  );
+  --clipboard-surface-strong: color-mix(
+    in srgb,
+    var(--tuff-bg-color, #ffffff) 94%,
+    var(--tuff-color-black, rgba(15, 23, 42, 1)) 6%
+  );
   --clipboard-border-color: var(--tuff-border-color, rgba(148, 163, 184, 0.24));
   --clipboard-border-strong: var(--tuff-border-color-strong, rgba(148, 163, 184, 0.38));
 
@@ -69,10 +82,17 @@ html.dark {
   --clipboard-text-muted: var(--tuff-text-color-subtle, #9ca3af);
   --clipboard-text-disabled: var(--tuff-text-color-disabled, #6b7280);
 
-  --clipboard-surface-elevated: var(--tuff-surface-elevated, rgba(17, 24, 39, 0.92));
-  --clipboard-surface-subtle: var(--tuff-surface-subtle, rgba(17, 24, 39, 0.78));
-  --clipboard-surface-ghost: var(--tuff-surface-ghost, rgba(51, 65, 85, 0.22));
-  --clipboard-surface-strong: var(--tuff-surface-strong, rgba(30, 41, 59, 0.38));
+  --clipboard-surface-base: var(--tuff-bg-color, #0f172a);
+  --clipboard-surface-elevated: var(
+    --tuff-fill-color-dark,
+    color-mix(in srgb, var(--tuff-bg-color, #0f172a) 88%, rgba(148, 163, 184, 0.24) 12%)
+  );
+  --clipboard-surface-subtle: var(
+    --tuff-fill-color-extra-dark,
+    color-mix(in srgb, var(--tuff-bg-color, #0f172a) 84%, rgba(148, 163, 184, 0.32) 16%)
+  );
+  --clipboard-surface-ghost: color-mix(in srgb, var(--tuff-bg-color, #0f172a) 76%, rgba(148, 163, 184, 0.32) 24%);
+  --clipboard-surface-strong: color-mix(in srgb, var(--tuff-bg-color, #0f172a) 70%, rgba(148, 163, 184, 0.48) 30%);
   --clipboard-border-color: var(--tuff-border-color, rgba(100, 116, 139, 0.28));
   --clipboard-border-strong: var(--tuff-border-color-strong, rgba(100, 116, 139, 0.38));
 }

@@ -227,6 +227,23 @@ function cleanupPreview(value: string): string {
   return value.replace(/\s+/g, ' ').trim()
 }
 
+function safeParseJsonArray(value: unknown): string[] {
+  if (typeof value !== 'string')
+    return []
+
+  const trimmed = value.trim()
+  if (!trimmed.startsWith('[') || !trimmed.endsWith(']'))
+    return []
+
+  try {
+    const parsed = JSON.parse(trimmed)
+    return Array.isArray(parsed) ? parsed.map(item => cleanupPreview(String(item))).filter(Boolean) : []
+  }
+  catch {
+    return []
+  }
+}
+
 const baseTypeIconMap: Record<ClipboardBaseType, string> = {
   text: 'i-carbon-text-align-left',
   html: 'i-carbon-code',
@@ -280,8 +297,17 @@ export function useClipboardContentInfo(
 
     const meta: ClipboardContentMeta[] = []
 
+    const knownBaseType = isClipboardBaseType(baseType) ? baseType : undefined
+    const allowTextHeuristics = !knownBaseType || knownBaseType === 'text' || knownBaseType === 'richtext'
+    const allowUrlHeuristics = allowTextHeuristics || knownBaseType === 'url'
+    const allowPathHeuristics = allowTextHeuristics || knownBaseType === 'file' || knownBaseType === 'files'
+
     if (Array.isArray(raw) && raw.length) {
-      const first = String(raw[0])
+      const first = cleanupPreview(String(raw[0]))
+      const extra = raw.slice(1, 4).map(item => cleanupPreview(String(item))).filter(Boolean)
+      const remainder = Math.max(0, raw.length - 4)
+      const secondary = extra.length ? `${extra.join(' · ')}${remainder ? ` · 等 ${remainder} 个` : ''}` : undefined
+
       meta.push({ label: '条目数量', value: String(raw.length) })
       return {
         content,
@@ -289,9 +315,51 @@ export function useClipboardContentInfo(
         type: 'file-path',
         label: typeLabelMap['file-path'],
         icon: typeIconMap['file-path'],
-        previewText: cleanupPreview(first),
-        secondaryText: truncate(cleanupPreview(trimmed), maxLength),
+        previewText: first,
+        secondaryText: secondary ? truncate(secondary, maxLength) : undefined,
         meta,
+      }
+    }
+
+    if (knownBaseType === 'files') {
+      const candidates: string[] = []
+
+      if (typeof raw === 'string') {
+        const parsed = safeParseJsonArray(raw)
+        if (parsed.length)
+          candidates.push(...parsed)
+      }
+
+      if (!candidates.length) {
+        const parsed = safeParseJsonArray(content)
+        if (parsed.length)
+          candidates.push(...parsed)
+      }
+
+      if (!candidates.length) {
+        const parts = content.split(/[\n;]+/).map(part => cleanupPreview(part)).filter(Boolean)
+        candidates.push(...parts)
+      }
+
+      if (candidates.length) {
+        const first = cleanupPreview(candidates[0])
+        const extra = candidates.slice(1, 4).map(item => cleanupPreview(item)).filter(Boolean)
+        const remainder = Math.max(0, candidates.length - 4)
+        const secondary = extra.length
+          ? `${extra.join(' · ')}${remainder ? ` · 等 ${remainder} 个` : ''}`
+          : undefined
+
+        meta.push({ label: '条目数量', value: String(candidates.length) })
+        return {
+          content,
+          baseType: baseType ?? undefined,
+          type: 'file-path',
+          label: typeLabelMap['file-path'],
+          icon: typeIconMap['file-path'],
+          previewText: first,
+          secondaryText: secondary ? truncate(secondary, maxLength) : undefined,
+          meta,
+        }
       }
     }
 
@@ -318,7 +386,7 @@ export function useClipboardContentInfo(
       }
     }
 
-    if (hexColorRegex.test(trimmed) || rgbColorRegex.test(trimmed) || hslColorRegex.test(trimmed)) {
+    if (allowTextHeuristics && (hexColorRegex.test(trimmed) || rgbColorRegex.test(trimmed) || hslColorRegex.test(trimmed))) {
       const normalized = hexColorRegex.test(trimmed) ? normaliseHexColor(trimmed) : trimmed
       meta.push({ label: '颜色值', value: normalized })
       return {
@@ -333,7 +401,7 @@ export function useClipboardContentInfo(
       }
     }
 
-    const url = parseUrl(trimmed)
+    const url = allowUrlHeuristics ? parseUrl(trimmed) : null
     if (url) {
       if (url.protocol === 'file:') {
         const isDirectory = url.pathname.endsWith('/')
@@ -389,7 +457,7 @@ export function useClipboardContentInfo(
       }
     }
 
-    if (emailRegex.test(trimmed)) {
+    if (allowTextHeuristics && emailRegex.test(trimmed)) {
       const [, domain] = trimmed.split('@')
       if (domain)
         meta.push({ label: '域名', value: domain })
@@ -405,7 +473,7 @@ export function useClipboardContentInfo(
       }
     }
 
-    if (phoneRegex.test(trimmed)) {
+    if (allowTextHeuristics && phoneRegex.test(trimmed)) {
       const digitsOnly = trimmed.replace(/\D/g, '')
       meta.push({ label: '长度', value: String(digitsOnly.length) })
       return {
@@ -420,7 +488,7 @@ export function useClipboardContentInfo(
       }
     }
 
-    if (ipRegex.test(trimmed)) {
+    if (allowTextHeuristics && ipRegex.test(trimmed)) {
       return {
         content,
         baseType: baseType ?? undefined,
@@ -432,7 +500,7 @@ export function useClipboardContentInfo(
       }
     }
 
-    if (verificationCodeRegex.test(trimmed)) {
+    if (allowTextHeuristics && verificationCodeRegex.test(trimmed)) {
       meta.push({ label: '位数', value: String(trimmed.length) })
       return {
         content,
@@ -445,7 +513,7 @@ export function useClipboardContentInfo(
       }
     }
 
-    if (windowsDirectoryRegex.test(trimmed) || unixDirectoryRegex.test(trimmed) || trimmed.endsWith('/') || trimmed.endsWith('\\')) {
+    if (allowPathHeuristics && (windowsDirectoryRegex.test(trimmed) || unixDirectoryRegex.test(trimmed) || trimmed.endsWith('/') || trimmed.endsWith('\\'))) {
       const normalized = trimmed
       return {
         content,
@@ -458,7 +526,7 @@ export function useClipboardContentInfo(
       }
     }
 
-    if (windowsPathRegex.test(trimmed) || unixPathRegex.test(trimmed) || tildePathRegex.test(trimmed)) {
+    if (allowPathHeuristics && (windowsPathRegex.test(trimmed) || unixPathRegex.test(trimmed) || tildePathRegex.test(trimmed))) {
       const normalized = trimmed
       return {
         content,
@@ -471,7 +539,7 @@ export function useClipboardContentInfo(
       }
     }
 
-    if (looksLikeJson(trimmed)) {
+    if (allowTextHeuristics && looksLikeJson(trimmed)) {
       const parsed = JSON.parse(trimmed)
       const size = JSON.stringify(parsed).length
       meta.push({ label: '大小', value: `${size} 字符` })
@@ -489,7 +557,7 @@ export function useClipboardContentInfo(
       }
     }
 
-    if (looksLikeHtml(trimmed)) {
+    if (allowTextHeuristics && looksLikeHtml(trimmed)) {
       meta.push({ label: '标签数量', value: String((trimmed.match(/<\w+/g) ?? []).length) })
       return {
         content,
@@ -502,7 +570,7 @@ export function useClipboardContentInfo(
       }
     }
 
-    if (looksLikeCode(trimmed)) {
+    if (allowTextHeuristics && looksLikeCode(trimmed)) {
       const lines = trimmed.split(/\r?\n/)
       meta.push({ label: '行数', value: String(lines.length) })
       return {
@@ -519,13 +587,24 @@ export function useClipboardContentInfo(
 
     const fallbackPreview = truncate(cleanupPreview(trimmed), maxLength)
     if (baseType) {
-      const knownBaseType = isClipboardBaseType(baseType) ? baseType : undefined
+      if (knownBaseType) {
+        return {
+          content,
+          baseType,
+          type: 'text',
+          label: baseTypeLabelMap[knownBaseType],
+          icon: baseTypeIconMap[knownBaseType],
+          previewText: fallbackPreview,
+          meta,
+        }
+      }
+
       return {
         content,
         baseType,
         type: 'text',
-        label: knownBaseType ? baseTypeLabelMap[knownBaseType] : typeLabelMap.text,
-        icon: knownBaseType ? baseTypeIconMap[knownBaseType] : typeIconMap.text,
+        label: typeLabelMap.text,
+        icon: typeIconMap.text,
         previewText: fallbackPreview,
         meta,
       }
