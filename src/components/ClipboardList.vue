@@ -31,6 +31,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   (event: 'select', item: PluginClipboardItem): void
+  (event: 'apply', item: PluginClipboardItem): void
   (event: 'refresh'): void
   (event: 'clear'): void
   (event: 'loadMore'): void
@@ -98,6 +99,10 @@ useEventListener(document, 'keydown', (event: KeyboardEvent) => {
 
 function handleSelect(item: PluginClipboardItem) {
   emit('select', item)
+}
+
+function handleApply(item: PluginClipboardItem) {
+  emit('apply', item)
 }
 
 function handleRefresh() {
@@ -172,6 +177,7 @@ function toggleFilterPanel() {
             :is-active="selectedKey === getItemKey(entry.item)"
             :format-timestamp="formatTimestamp"
             @select="handleSelect"
+            @apply="handleApply"
           />
         </ClipboardSection>
       </template>

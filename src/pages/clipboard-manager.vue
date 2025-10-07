@@ -19,6 +19,8 @@ const {
   isClearing,
   favoritePending,
   deletePending,
+  applyPending,
+  copyPending,
   errorMessage,
   total,
   pageSize,
@@ -29,6 +31,9 @@ const {
   deleteSelected,
   clearHistory,
   selectItem,
+  selectAndApply,
+  applyItem,
+  copyItem,
   formatTimestamp,
 } = clipboardManager
 </script>
@@ -49,6 +54,7 @@ const {
         :format-timestamp="formatTimestamp"
         v-on="{
           select: selectItem,
+          apply: selectAndApply,
           refresh: refreshHistory,
           clear: clearHistory,
           loadMore,
@@ -61,10 +67,14 @@ const {
         :item="selectedItem"
         :favorite-pending="favoritePending"
         :delete-pending="deletePending"
+        :apply-pending="applyPending"
+        :copy-pending="copyPending"
         :format-timestamp="formatTimestamp"
         v-on="{
           toggleFavorite,
           delete: deleteSelected,
+          copy: () => copyItem(),
+          apply: () => applyItem(),
         }"
       />
     </template>

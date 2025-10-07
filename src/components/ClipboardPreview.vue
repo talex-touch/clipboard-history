@@ -7,12 +7,16 @@ const props = defineProps<{
   item: PluginClipboardItem | null
   favoritePending: boolean
   deletePending: boolean
+  applyPending: boolean
+  copyPending: boolean
   formatTimestamp: (timestamp: PluginClipboardItem['timestamp']) => string
 }>()
 
 const emit = defineEmits<{
   (event: 'toggleFavorite'): void
   (event: 'delete'): void
+  (event: 'copy'): void
+  (event: 'apply'): void
 }>()
 
 interface InfoRow {
@@ -131,13 +135,21 @@ function handleToggleFavorite() {
 function handleDelete() {
   emit('delete')
 }
+
+function handleCopy() {
+  emit('copy')
+}
+
+function handleApply() {
+  emit('apply')
+}
 </script>
 
 <template>
   <div class="clipboard-preview">
-    <header class="preview-header">
+    <header class="preview-header" :class="{ 'is-empty': !item }">
       <div class="header-main">
-        <div class="type-pill" aria-hidden="true">
+        <div class="type-indicator" aria-hidden="true">
           <span :class="currentIcon" />
         </div>
         <div class="title-block">
@@ -148,9 +160,9 @@ function handleDelete() {
           </p>
         </div>
       </div>
-      <div class="header-actions">
+      <div v-if="item" class="header-actions">
         <button
-          class="action-button"
+          class="header-button"
           type="button"
           :disabled="favoritePending || !item?.id"
           @click="handleToggleFavorite"
@@ -165,7 +177,7 @@ function handleDelete() {
           }}
         </button>
         <button
-          class="action-button danger"
+          class="header-button danger"
           type="button"
           :disabled="deletePending || !item?.id"
           @click="handleDelete"
@@ -176,7 +188,36 @@ function handleDelete() {
       </div>
     </header>
 
-    <div class="preview-surface">
+    <div class="preview-surface" :class="{ 'is-empty': !item }">
+      <div v-if="item" class="surface-toolbar">
+        <div class="surface-meta">
+          <span class="meta-chip">{{ typeLabel }}</span>
+          <a v-if="linkHref" class="meta-link" :href="linkHref" target="_blank" rel="noopener noreferrer">
+            <span class="i-carbon-launch" aria-hidden="true" />
+            打开链接
+          </a>
+        </div>
+        <div class="surface-actions">
+          <button
+            class="surface-button"
+            type="button"
+            :disabled="copyPending || !item"
+            @click="handleCopy"
+          >
+            <span class="i-carbon-copy" aria-hidden="true" />
+            {{ copyPending ? '复制中…' : '复制' }}
+          </button>
+          <button
+            class="surface-button primary"
+            type="button"
+            :disabled="applyPending || !item"
+            @click="handleApply"
+          >
+            <span class="i-carbon-paste" aria-hidden="true" />
+            {{ applyPending ? '粘贴中…' : '粘贴到当前应用' }}
+          </button>
+        </div>
+      </div>
       <div v-if="!item" class="preview-empty">
         <div class="empty-icon" aria-hidden="true">
           <span class="i-carbon-arrow-up-right" aria-hidden="true" />
@@ -208,16 +249,16 @@ function handleDelete() {
           <pre v-if="!fileList.length">{{ item.rawContent ?? item.content }}</pre>
         </div>
         <div v-else-if="derivedType === 'url' || derivedType === 'email' || derivedType === 'email-link' || derivedType === 'phone'" class="preview-block link">
-          <a
-            v-if="linkHref"
-            :href="linkHref"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            {{ previewPrimaryText }}
-          </a>
-          <p v-else>
-            {{ previewPrimaryText }}
+          <p class="link-primary">
+            <a
+              v-if="linkHref"
+              :href="linkHref"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              {{ previewPrimaryText }}
+            </a>
+            <span v-else>{{ previewPrimaryText }}</span>
           </p>
           <p v-if="previewSecondaryText" class="link-secondary">
             {{ previewSecondaryText }}
@@ -250,8 +291,8 @@ function handleDelete() {
   display: flex;
   flex-direction: column;
   height: 100%;
-  padding: 28px 26px 22px;
-  gap: 22px;
+  padding: 22px 20px 18px;
+  gap: 18px;
   box-sizing: border-box;
   color: var(--clipboard-text-primary);
 }
@@ -260,37 +301,36 @@ function handleDelete() {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 18px;
+  gap: 14px;
+}
+
+.preview-header.is-empty {
+  border-bottom: 1px dashed var(--clipboard-border-color);
+  padding-bottom: 8px;
 }
 
 .header-main {
   display: flex;
   align-items: center;
-  gap: 16px;
+  gap: 12px;
   min-width: 0;
 }
 
-.type-pill {
-  width: 52px;
-  height: 52px;
-  border-radius: 18px;
-  background: var(--clipboard-color-accent-soft-fallback);
-  background: linear-gradient(
-    145deg,
-    color-mix(in srgb, var(--clipboard-color-accent, #6366f1) 24%, transparent),
-    color-mix(in srgb, var(--clipboard-color-accent, #6366f1) 38%, transparent)
-  );
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.4);
-  box-shadow: inset 0 1px 0 color-mix(in srgb, #ffffff 40%, transparent);
-  display: flex;
+.type-indicator {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  background: var(--clipboard-surface-strong);
+  border: 1px solid var(--clipboard-border-color);
+  display: inline-flex;
   align-items: center;
   justify-content: center;
   color: var(--clipboard-color-accent-strong, var(--clipboard-color-accent, #6366f1));
-  font-size: 1.6rem;
+  font-size: 1.25rem;
 }
 
-.type-pill > span {
-  font-size: 1.6rem;
+.type-indicator > span {
+  font-size: 1.25rem;
 }
 
 .title-block h2 {
@@ -316,67 +356,147 @@ function handleDelete() {
 .header-actions {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 8px;
 }
 
-.action-button {
+.header-button {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  padding: 10px 16px;
-  border-radius: 999px;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 8px;
   border: 1px solid var(--clipboard-border-color);
-  background: var(--clipboard-surface-subtle);
+  background: var(--clipboard-surface-strong);
   color: var(--clipboard-text-secondary);
-  font-weight: 600;
+  font-weight: 500;
   cursor: pointer;
-  transition: all 0.18s ease;
+  transition:
+    background 0.18s ease,
+    border-color 0.18s ease,
+    color 0.18s ease;
+  font-size: 0.9rem;
 }
 
-.action-button:hover:not(:disabled) {
+.header-button:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--clipboard-color-accent, #6366f1) 12%, transparent);
   border-color: var(--clipboard-color-accent, #6366f1);
-  background: var(--clipboard-color-accent-soft-fallback);
-  background: color-mix(in srgb, var(--clipboard-color-accent, #6366f1) 14%, transparent);
   color: var(--clipboard-color-accent-strong, var(--clipboard-color-accent, #6366f1));
-  box-shadow: var(--clipboard-shadow-ghost);
 }
 
-.action-button.danger {
+.header-button.danger {
   color: var(--clipboard-color-danger, #ef4444);
-  border-color: rgba(239, 68, 68, 0.35);
-  border-color: color-mix(in srgb, var(--clipboard-color-danger, #ef4444) 35%, transparent);
+  border-color: color-mix(in srgb, var(--clipboard-color-danger, #ef4444) 36%, transparent);
 }
 
-.action-button.danger:hover:not(:disabled) {
+.header-button.danger:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--clipboard-color-danger, #ef4444) 12%, transparent);
   border-color: var(--clipboard-color-danger, #ef4444);
-  background: var(--clipboard-color-danger-soft-fallback);
-  background: color-mix(in srgb, var(--clipboard-color-danger, #ef4444) 16%, transparent);
-  box-shadow: var(--clipboard-shadow-ghost);
+  color: var(--clipboard-color-danger, #ef4444);
 }
 
-.action-button:disabled {
+.header-button:disabled {
   opacity: 0.65;
   cursor: not-allowed;
   color: var(--clipboard-text-disabled);
-  border-color: rgba(148, 163, 184, 0.26);
-  border-color: color-mix(in srgb, var(--clipboard-border-color, rgba(148, 163, 184, 0.24)) 60%, transparent);
 }
 
 .preview-surface {
   position: relative;
   flex: 1;
-  border-radius: 22px;
-  background: var(--clipboard-surface-elevated);
-  background: linear-gradient(
-    180deg,
-    color-mix(in srgb, var(--clipboard-surface-elevated, rgba(255, 255, 255, 0.96)) 96%, transparent),
-    color-mix(in srgb, var(--clipboard-surface-subtle, rgba(245, 247, 252, 0.92)) 92%, transparent)
-  );
+  border-radius: 12px;
+  background: var(--clipboard-surface-strong);
   border: 1px solid var(--clipboard-border-color);
-  padding: 24px;
+  padding: 18px;
   overflow-y: auto;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.65);
-  box-shadow: inset 0 1px 0 color-mix(in srgb, #ffffff 65%, transparent);
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.preview-surface.is-empty {
+  justify-content: center;
+}
+
+.surface-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.surface-meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.meta-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: var(--clipboard-surface-ghost);
+  color: var(--clipboard-text-secondary);
+  font-size: 0.78rem;
+  white-space: nowrap;
+}
+
+.meta-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.82rem;
+  color: var(--clipboard-color-accent-strong, var(--clipboard-color-accent, #6366f1));
+  text-decoration: none;
+}
+
+.meta-link:hover {
+  text-decoration: underline;
+}
+
+.surface-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.surface-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--clipboard-border-color);
+  background: var(--clipboard-surface-subtle);
+  color: var(--clipboard-text-secondary);
+  cursor: pointer;
+  font-size: 0.9rem;
+  transition:
+    background 0.18s ease,
+    border-color 0.18s ease,
+    color 0.18s ease;
+}
+
+.surface-button.primary {
+  background: var(--clipboard-color-accent, #6366f1);
+  border-color: var(--clipboard-color-accent, #6366f1);
+  color: #fff;
+}
+
+.surface-button:hover:not(:disabled) {
+  border-color: var(--clipboard-color-accent, #6366f1);
+  color: var(--clipboard-color-accent-strong, var(--clipboard-color-accent, #6366f1));
+}
+
+.surface-button.primary:hover:not(:disabled) {
+  filter: brightness(1.05);
+  color: #fff;
+}
+
+.surface-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 .preview-empty {
@@ -385,45 +505,41 @@ function handleDelete() {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 14px;
+  gap: 12px;
   color: var(--clipboard-text-muted);
+  text-align: center;
 }
 
 .preview-empty .empty-icon {
-  width: 64px;
-  height: 64px;
-  border-radius: 20px;
+  width: 52px;
+  height: 52px;
+  border-radius: 14px;
   background: var(--clipboard-surface-ghost);
-  background: linear-gradient(
-    150deg,
-    color-mix(in srgb, var(--clipboard-surface-ghost, rgba(148, 163, 184, 0.16)) 65%, transparent),
-    color-mix(in srgb, var(--clipboard-surface-ghost, rgba(148, 163, 184, 0.16)) 92%, transparent)
-  );
   display: inline-flex;
   align-items: center;
   justify-content: center;
   color: var(--clipboard-text-muted);
-  font-size: 1.6rem;
+  font-size: 1.4rem;
 }
 
 .preview-block {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 12px;
 }
 
 .preview-block.color {
   flex-direction: row;
   align-items: center;
-  gap: 24px;
+  gap: 20px;
 }
 
 .preview-block.color .color-sample {
-  width: 140px;
-  height: 140px;
-  border-radius: 28px;
-  border: 1px solid color-mix(in srgb, var(--clipboard-border-color) 68%, transparent);
-  box-shadow: var(--clipboard-shadow-strong);
+  width: 120px;
+  height: 120px;
+  border-radius: 12px;
+  border: 1px solid var(--clipboard-border-color);
+  box-shadow: none;
 }
 
 .preview-block.color .color-details {
@@ -446,15 +562,16 @@ function handleDelete() {
 
 .preview-block.text pre {
   margin: 0;
-  padding: 16px;
-  border-radius: 16px;
-  background: var(--clipboard-surface-strong);
+  padding: 14px;
+  border-radius: 10px;
+  background: var(--clipboard-surface-ghost);
   border: 1px solid var(--clipboard-border-color);
   color: var(--clipboard-text-primary);
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Courier New', monospace;
   white-space: pre-wrap;
   word-break: break-word;
   line-height: 1.5;
+  font-size: 0.92rem;
 }
 
 .preview-block.image {
@@ -463,25 +580,26 @@ function handleDelete() {
 
 .preview-block.image img {
   max-width: 100%;
-  border-radius: 20px;
-  box-shadow: var(--clipboard-shadow-strong);
+  border-radius: 12px;
+  box-shadow: var(--clipboard-shadow-soft, 0 8px 20px rgba(15, 23, 42, 0.12));
 }
 
 .preview-block.link {
   gap: 10px;
 }
 
-.preview-block.link a {
-  color: var(--clipboard-color-accent-strong, var(--clipboard-color-accent, #6366f1));
+.preview-block.link .link-primary {
+  margin: 0;
   font-weight: 600;
   word-break: break-all;
 }
 
-.preview-block.link p {
-  margin: 0;
+.preview-block.link a {
+  color: var(--clipboard-color-accent-strong, var(--clipboard-color-accent, #6366f1));
 }
 
 .preview-block.link .link-secondary {
+  margin: 0;
   color: var(--clipboard-text-muted);
 }
 
@@ -504,18 +622,18 @@ function handleDelete() {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 12px 14px;
-  border-radius: 14px;
+  padding: 10px 12px;
+  border-radius: 10px;
   background: var(--clipboard-surface-ghost);
-  border: 1px solid var(--clipboard-border-color);
+  border: 1px dashed color-mix(in srgb, var(--clipboard-border-color) 70%, transparent);
   color: var(--clipboard-text-secondary);
 }
 
 .preview-block.files pre {
   margin: 0;
-  padding: 14px;
-  border-radius: 14px;
-  background: var(--clipboard-surface-strong);
+  padding: 12px;
+  border-radius: 10px;
+  background: var(--clipboard-surface-subtle);
   border: 1px solid var(--clipboard-border-color);
   color: var(--clipboard-text-primary);
   font-size: 0.9rem;
@@ -526,15 +644,15 @@ function handleDelete() {
 .preview-info {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  gap: 14px;
+  gap: 12px;
 }
 
 .info-row {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  padding: 14px;
-  border-radius: 18px;
+  gap: 4px;
+  padding: 12px;
+  border-radius: 10px;
   background: var(--clipboard-surface-ghost);
   border: 1px solid var(--clipboard-border-color);
   color: var(--clipboard-text-primary);
@@ -573,11 +691,7 @@ function handleDelete() {
 
 @media (max-width: 1024px) {
   .clipboard-preview {
-    padding: 22px 20px 18px;
-  }
-
-  .preview-surface {
-    border-radius: 20px;
+    padding: 18px 16px;
   }
 }
 
@@ -585,15 +699,27 @@ function handleDelete() {
   .preview-header {
     flex-direction: column;
     align-items: flex-start;
+    gap: 10px;
   }
 
   .header-actions {
     align-self: stretch;
   }
 
-  .action-button {
+  .header-button,
+  .surface-button {
     flex: 1;
     justify-content: center;
+  }
+
+  .surface-toolbar {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+
+  .surface-actions {
+    width: 100%;
   }
 }
 </style>

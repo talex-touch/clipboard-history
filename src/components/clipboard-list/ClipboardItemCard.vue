@@ -12,6 +12,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   (event: 'select', item: PluginClipboardItem): void
+  (event: 'apply', item: PluginClipboardItem): void
 }>()
 
 const itemKey = computed(() => getItemKey(props.item))
@@ -30,6 +31,7 @@ const colorSwatch = computed(() => itemInfo.value.colorSwatch)
 
 function handleSelect() {
   emit('select', props.item)
+  emit('apply', props.item)
 }
 </script>
 

@@ -85,7 +85,9 @@ function formatTimestamp(timestamp: PluginClipboardItem['timestamp']) {
 }
 
 export function useClipboardManager() {
-  const clipboard = useClipboardHistory()
+  const clipboard = useClipboardHistory() as ReturnType<typeof useClipboardHistory> & {
+    applyToActiveApp?: (options: { item?: PluginClipboardItem }) => Promise<boolean>
+  }
 
   const clipboardItems = ref<PluginClipboardItem[]>([])
   const selectedItem = ref<PluginClipboardItem | null>(null)
@@ -95,6 +97,8 @@ export function useClipboardManager() {
   const isClearing = ref(false)
   const favoritePending = ref(false)
   const deletePending = ref(false)
+  const applyPending = ref(false)
+  const copyPending = ref(false)
   const errorMessage = ref<string | null>(null)
 
   const page = ref(1)
@@ -111,6 +115,67 @@ export function useClipboardManager() {
       return -1
     return clipboardItems.value.findIndex(item => getItemKey(item) === selectedKey.value)
   })
+
+  function resolvePluginChannel() {
+    if (typeof window === 'undefined')
+      return null
+    const channel = (window as any)?.$channel
+    if (channel && typeof channel.send === 'function')
+      return channel
+    return null
+  }
+
+  function parseFileListFromItem(item: PluginClipboardItem): string[] {
+    if (!item.content)
+      return []
+    try {
+      const parsed = JSON.parse(item.content)
+      if (Array.isArray(parsed))
+        return parsed.map(entry => String(entry)).filter(Boolean)
+    }
+    catch {
+      // ignore
+    }
+    return item.content.split(/\r?\n|;+/).map(entry => entry.trim()).filter(Boolean)
+  }
+
+  async function writeClipboardFromItem(item: PluginClipboardItem): Promise<void> {
+    if (typeof navigator === 'undefined' || !navigator.clipboard)
+      throw new Error('当前环境暂不支持直接写入系统剪贴板')
+
+    if (item.type === 'image' && item.content?.startsWith('data:')) {
+      if (typeof ClipboardItem === 'undefined')
+        throw new Error('当前浏览器不支持写入图片到剪贴板')
+
+      const response = await fetch(item.content)
+      const blob = await response.blob()
+      const clipboardItem = new ClipboardItem({ [blob.type || 'image/png']: blob })
+      await navigator.clipboard.write([clipboardItem])
+      return
+    }
+
+    if (item.type === 'text') {
+      if (item.rawContent && typeof item.rawContent === 'string' && typeof ClipboardItem !== 'undefined') {
+        const textBlob = new Blob([item.content ?? ''], { type: 'text/plain' })
+        const htmlBlob = new Blob([item.rawContent], { type: 'text/html' })
+        const clipboardItem = new ClipboardItem({ 'text/html': htmlBlob, 'text/plain': textBlob })
+        await navigator.clipboard.write([clipboardItem])
+        return
+      }
+      await navigator.clipboard.writeText(item.content ?? '')
+      return
+    }
+
+    if (item.type === 'files') {
+      const files = parseFileListFromItem(item)
+      if (files.length) {
+        await navigator.clipboard.writeText(files.join('\n'))
+        return
+      }
+    }
+
+    await navigator.clipboard.writeText(item.content ?? '')
+  }
 
   function ensureItemVisible(key: string) {
     if (typeof document === 'undefined')
@@ -260,6 +325,60 @@ export function useClipboardManager() {
     await loadHistory({ reset: false, ensureSelectionVisible: false })
   }
 
+  async function applyItem(item: PluginClipboardItem | null = selectedItem.value): Promise<boolean> {
+    if (!item || applyPending.value)
+      return false
+
+    applyPending.value = true
+    errorMessage.value = null
+
+    try {
+      if (typeof clipboard.applyToActiveApp === 'function') {
+        const success = await clipboard.applyToActiveApp({ item })
+        if (!success)
+          throw new Error('自动粘贴失败')
+        return true
+      }
+
+      const channel = resolvePluginChannel()
+      if (!channel)
+        throw new Error('无法调用自动粘贴通道')
+
+      const response = await channel.send('clipboard:apply-to-active-app', { item })
+      if (response && typeof response === 'object' && 'success' in response && !response.success)
+        throw new Error((response as { message?: string }).message ?? '自动粘贴失败')
+
+      return true
+    }
+    catch (error) {
+      errorMessage.value = formatError(error)
+      return false
+    }
+    finally {
+      applyPending.value = false
+    }
+  }
+
+  async function copyItem(item: PluginClipboardItem | null = selectedItem.value): Promise<boolean> {
+    if (!item || copyPending.value)
+      return false
+
+    copyPending.value = true
+    errorMessage.value = null
+
+    try {
+      await writeClipboardFromItem(item)
+      return true
+    }
+    catch (error) {
+      errorMessage.value = formatError(error)
+      return false
+    }
+    finally {
+      copyPending.value = false
+    }
+  }
+
   async function toggleFavorite() {
     if (!selectedItem.value?.id || favoritePending.value)
       return
@@ -339,6 +458,11 @@ export function useClipboardManager() {
     setSelection(item)
   }
 
+  async function selectAndApply(item: PluginClipboardItem) {
+    setSelection(item)
+    await applyItem(item)
+  }
+
   function handleClipboardChange(item: PluginClipboardItem) {
     const key = getItemKey(item)
     const index = clipboardItems.value.findIndex(existing => getItemKey(existing) === key)
@@ -388,6 +512,8 @@ export function useClipboardManager() {
     isClearing,
     favoritePending,
     deletePending,
+    applyPending,
+    copyPending,
     errorMessage,
     page,
     total,
@@ -403,6 +529,9 @@ export function useClipboardManager() {
     toggleFavorite,
     deleteSelected,
     clearHistory,
+    applyItem,
+    copyItem,
+    selectAndApply,
     formatTimestamp,
     loadHistory,
     getItemKey,
