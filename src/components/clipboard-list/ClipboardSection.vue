@@ -1,16 +1,33 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, watch } from 'vue'
 
-defineProps<{
-  title: string
-  count: number
-}>()
+const props = withDefaults(
+  defineProps<{
+    title: string
+    count: number
+    collapseDisabled?: boolean
+  }>(),
+  {
+    collapseDisabled: false,
+  },
+)
 
 const isCollapsed = ref(false)
 
 function toggleCollapse() {
+  if (props.collapseDisabled)
+    return
   isCollapsed.value = !isCollapsed.value
 }
+
+watch(
+  () => props.collapseDisabled,
+  (disabled) => {
+    if (disabled)
+      isCollapsed.value = false
+  },
+  { immediate: true },
+)
 
 function rememberBoxMetrics(el: HTMLElement) {
   if (el.dataset.collapsePaddingTop && el.dataset.collapsePaddingBottom && el.dataset.collapseMarginTop)
@@ -111,14 +128,21 @@ function collapseLeave(el: HTMLElement) {
 </script>
 
 <template>
-  <section class="flex flex-col cursor-pointer select-none" role="group">
+  <section
+    class="flex flex-col select-none"
+    :class="collapseDisabled ? 'cursor-default' : 'cursor-pointer'"
+    role="group"
+  >
     <header class="section-header flex items-center justify-between gap-2 p-2">
       <h3>{{ title }} ({{ count }}条)</h3>
       <button
+        v-if="!collapseDisabled"
         class="collapse-toggle h-7 w-7 inline-flex items-center justify-center rounded-full text-base transition-colors duration-200 ease-out"
         type="button"
         :aria-expanded="!isCollapsed"
         :aria-label="`${isCollapsed ? '展开' : '收起'}${title}`"
+        :aria-disabled="collapseDisabled || undefined"
+        :disabled="collapseDisabled"
         @click="toggleCollapse"
       >
         <span
@@ -188,5 +212,12 @@ function collapseLeave(el: HTMLElement) {
 
 .collapse-toggle span {
   display: block;
+}
+
+.collapse-toggle:disabled {
+  cursor: default;
+  border-color: transparent;
+  background: transparent;
+  color: color-mix(in srgb, var(--clipboard-text-muted) 64%, transparent);
 }
 </style>

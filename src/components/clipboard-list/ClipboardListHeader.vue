@@ -42,7 +42,7 @@ const multiSelectLabel = computed(() => {
 </script>
 
 <template>
-  <header class="header-root flex items-center justify-between gap-2 text-sm">
+  <header class="header-root mt-2 flex items-center justify-between gap-2 text-sm">
     <div class="header-title">
       <p>
         {{ summaryText }}

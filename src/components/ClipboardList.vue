@@ -153,7 +153,7 @@ function isItemInMultiSelection(item: PluginClipboardItem) {
 
 <template>
   <div
-    class="ClipboardList items-between h-full flex flex-col justify-center gap-2 overflow-hidden py-2"
+    class="ClipboardList items-between h-full flex flex-col justify-center gap-2 overflow-hidden"
     role="listbox"
     tabindex="0"
     :aria-activedescendant="selectedKey ? `clipboard-item-${selectedKey}` : undefined"
@@ -217,6 +217,7 @@ function isItemInMultiSelection(item: PluginClipboardItem) {
           :key="section.key"
           :title="section.title"
           :count="section.items.length"
+          :collapse-disabled="section.items.length >= 100"
         >
           <ClipboardItemCard
             v-for="entry in section.items"
