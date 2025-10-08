@@ -3,7 +3,7 @@ import type { PluginClipboardItem } from '@talex-touch/utils/plugin/sdk/types'
 import type { FilterOption } from '~/composables/useClipboardFilters'
 import type { SectionDefinition } from '~/composables/useClipboardSections'
 import { onClickOutside, useEventListener } from '@vueuse/core'
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import ClipboardEmptyState from '~/components/clipboard-list/ClipboardEmptyState.vue'
 import ClipboardItemCard from '~/components/clipboard-list/ClipboardItemCard.vue'
 import ClipboardListFilterPanel from '~/components/clipboard-list/ClipboardListFilterPanel.vue'
@@ -64,6 +64,9 @@ const sectionDefinitions: SectionDefinition[] = [
 
 const scrollAreaRef = ref<HTMLElement | null>(null)
 const filterControlsRef = ref<HTMLElement | null>(null)
+const shouldDisableLoadMore = ref(false)
+const pendingFilteredLoad = ref(false)
+const baselineFilteredCount = ref(0)
 
 const filterState = useClipboardFilters({
   items: () => props.items,
@@ -116,6 +119,13 @@ function handleRefresh() {
 }
 
 function handleLoadMore() {
+  if (!props.canLoadMore || props.isLoadingMore || shouldDisableLoadMore.value)
+    return
+
+  if (filterState.hasActiveFilter.value) {
+    baselineFilteredCount.value = filterState.filteredItems.value.length
+    pendingFilteredLoad.value = true
+  }
   emit('loadMore')
 }
 
@@ -148,6 +158,32 @@ function handleBulkFavoriteSelected() {
 function isItemInMultiSelection(item: PluginClipboardItem) {
   return multiSelectedSet.value.has(getItemKey(item))
 }
+
+watch(() => filterState.selectedFilter.value, () => {
+  shouldDisableLoadMore.value = false
+  pendingFilteredLoad.value = false
+})
+
+watch(() => filterState.filteredItems.value.length, (current, previous) => {
+  if (current > previous)
+    shouldDisableLoadMore.value = false
+})
+
+watch(() => props.isLoadingMore, (isLoadingMore, wasLoadingMore) => {
+  if (!filterState.hasActiveFilter.value) {
+    pendingFilteredLoad.value = false
+    return
+  }
+
+  if (wasLoadingMore && !isLoadingMore && pendingFilteredLoad.value) {
+    const currentCount = filterState.filteredItems.value.length
+    if (currentCount <= baselineFilteredCount.value)
+      shouldDisableLoadMore.value = true
+    pendingFilteredLoad.value = false
+  }
+})
+
+const canDisplayLoadMore = computed(() => props.canLoadMore && !shouldDisableLoadMore.value)
 </script>
 
 <template>
@@ -230,7 +266,7 @@ function isItemInMultiSelection(item: PluginClipboardItem) {
       <ClipboardEmptyState v-else :is-loading="isLoading" />
 
       <ClipboardLoadMore
-        :can-load-more="canLoadMore"
+        :can-load-more="canDisplayLoadMore"
         :is-loading="isLoading"
         :is-loading-more="isLoadingMore"
         @load-more="handleLoadMore"

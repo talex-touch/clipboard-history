@@ -116,6 +116,7 @@ export function useClipboardManager() {
   const page = ref(1)
   const total = ref(0)
   const pageSize = ref(0)
+  const hasReachedHistoryEnd = ref(false)
 
   const multiSelectMode = ref(false)
   const multiSelectedKeys = ref<string[]>([])
@@ -123,7 +124,7 @@ export function useClipboardManager() {
   let stopClipboardListener: (() => void) | null = null
   let stopHotkeys: (() => void) | undefined
 
-  const canLoadMore = computed(() => clipboardItems.value.length < total.value)
+  const canLoadMore = computed(() => !hasReachedHistoryEnd.value && clipboardItems.value.length < total.value)
   const multiSelectedKeySet = computed(() => new Set(multiSelectedKeys.value))
   const multiSelectedCount = computed(() => multiSelectedKeys.value.length)
   const multiSelectedItems = computed(() => {
@@ -339,8 +340,10 @@ export function useClipboardManager() {
     if (showInitialSpinner || reset)
       errorMessage.value = null
 
-    if (reset)
+    if (reset) {
       page.value = 1
+      hasReachedHistoryEnd.value = false
+    }
 
     const targetPage = reset ? 1 : page.value + 1
 
@@ -355,12 +358,33 @@ export function useClipboardManager() {
     try {
       const payload = await clipboard.getHistory({ page: targetPage })
       const history = payload.history ?? []
+      const previousLength = reset ? 0 : clipboardItems.value.length
+      const resolvedPage = typeof payload.page === 'number' ? payload.page : targetPage
+      const resolvedPageSize = typeof payload.pageSize === 'number' ? payload.pageSize : pageSize.value
 
-      page.value = payload.page
+      page.value = resolvedPage
       total.value = payload.total
-      pageSize.value = payload.pageSize
+      pageSize.value = resolvedPageSize
 
       clipboardItems.value = reset ? history : mergeHistory(clipboardItems.value, history)
+      const nextLength = clipboardItems.value.length
+
+      if (reset) {
+        const hasMore
+          = resolvedPageSize > 0
+            ? history.length >= resolvedPageSize
+            : history.length > 0
+        hasReachedHistoryEnd.value = !hasMore
+      }
+      else {
+        const reachedEnd
+          = history.length === 0
+            || resolvedPage < targetPage
+            || (resolvedPageSize > 0 && history.length < resolvedPageSize)
+            || nextLength === previousLength
+
+        hasReachedHistoryEnd.value = !!reachedEnd
+      }
 
       if (ensureSelectionVisible)
         ensureSelection()
@@ -600,6 +624,7 @@ export function useClipboardManager() {
       clipboardItems.value.splice(index, 1, { ...clipboardItems.value[index], ...item })
     }
 
+    hasReachedHistoryEnd.value = false
     ensureSelection(key)
   }
 
