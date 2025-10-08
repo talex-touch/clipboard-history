@@ -1,17 +1,21 @@
 <script setup lang="ts">
+import { computed } from 'vue'
+import SyncIndicator from '~/components/SyncIndicator.vue'
+
 const props = defineProps<{
   summaryText: string
   isLoading: boolean
   activeFilterLabel: string
   hasActiveFilter: boolean
-  isClearing: boolean
   hasItems: boolean
+  multiSelectMode: boolean
+  multiSelectedCount: number
 }>()
 
 const emit = defineEmits<{
   (event: 'toggleFilter'): void
   (event: 'refresh'): void
-  (event: 'clear'): void
+  (event: 'toggleMultiSelect'): void
 }>()
 
 function handleToggleFilter() {
@@ -22,10 +26,19 @@ function handleRefresh() {
     emit('refresh')
 }
 
-function handleClear() {
-  if (!props.isClearing && props.hasItems)
-    emit('clear')
+function handleToggleMultiSelect() {
+  if (!props.hasItems && !props.multiSelectMode)
+    return
+  emit('toggleMultiSelect')
 }
+
+const multiSelectLabel = computed(() => {
+  if (props.multiSelectMode) {
+    const suffix = props.multiSelectedCount > 0 ? ` (${props.multiSelectedCount})` : ''
+    return `退出多选${suffix}`
+  }
+  return '多选'
+})
 </script>
 
 <template>
@@ -45,10 +58,7 @@ function handleClear() {
         <span class="i-carbon-filter text-sm" aria-hidden="true" />
         {{ activeFilterLabel }}
       </button>
-      <div v-if="isLoading" class="sync-indicator inline-flex items-center gap-1.5 text-xs">
-        <span class="spinner h-3 w-3 animate-spin border-2 rounded-full" aria-hidden="true" />
-        正在同步…
-      </div>
+      <SyncIndicator v-if="isLoading" size="sm" />
       <button
         class="icon-button"
         type="button"
@@ -58,12 +68,14 @@ function handleClear() {
         <span class="i-carbon-renew block" aria-hidden="true" />
       </button>
       <button
-        class="icon-button danger"
+        class="multi-select-toggle inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold transition"
+        :class="{ active: multiSelectMode }"
         type="button"
-        :disabled="isClearing || !hasItems"
-        @click="handleClear"
+        :disabled="!hasItems && !multiSelectMode"
+        @click="handleToggleMultiSelect"
       >
-        <span class="i-carbon-trash-can block" aria-hidden="true" />
+        <span :class="multiSelectMode ? 'i-carbon-checkbox-checked-filled' : 'i-carbon-checkbox-multiple'" aria-hidden="true" />
+        {{ multiSelectLabel }}
       </button>
     </div>
   </header>
@@ -80,34 +92,32 @@ function handleClear() {
   font-weight: 600;
 }
 
-.filter-toggle {
+.filter-toggle,
+.multi-select-toggle {
   border: 1px solid var(--clipboard-border-color);
   background: var(--clipboard-surface-subtle);
   color: var(--clipboard-text-secondary);
 }
 
-.filter-toggle:hover {
+.filter-toggle:hover,
+.multi-select-toggle:hover {
   border-color: var(--clipboard-color-accent, #6366f1);
   background: var(--clipboard-color-accent-softer-fallback);
   background: color-mix(in srgb, var(--clipboard-color-accent, #6366f1) 8%, transparent);
   color: var(--clipboard-color-accent-strong, var(--clipboard-color-accent, #6366f1));
 }
 
-.filter-toggle.active {
+.filter-toggle.active,
+.multi-select-toggle.active {
   border-color: var(--clipboard-color-accent, #6366f1);
   background: var(--clipboard-color-accent-soft-fallback);
   background: color-mix(in srgb, var(--clipboard-color-accent, #6366f1) 14%, transparent);
   color: var(--clipboard-color-accent-strong, var(--clipboard-color-accent, #6366f1));
 }
 
-.sync-indicator {
-  color: var(--clipboard-text-muted);
-}
-
-.sync-indicator .spinner {
-  border-color: rgba(148, 163, 184, 0.28);
-  border-color: color-mix(in srgb, var(--clipboard-text-muted, #94a3b8) 36%, transparent);
-  border-top-color: var(--clipboard-color-accent, #6366f1);
+.multi-select-toggle:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 .icon-button {
@@ -128,20 +138,6 @@ function handleClear() {
 .icon-button:disabled {
   opacity: 0.56;
   cursor: not-allowed;
-}
-
-.icon-button.danger {
-  color: var(--clipboard-color-danger, #ef4444);
-}
-
-.icon-button.danger:hover:not(:disabled) {
-  border-color: var(--clipboard-color-danger, #ef4444);
-  background: var(--clipboard-color-danger-soft-fallback);
-  background: color-mix(in srgb, var(--clipboard-color-danger, #ef4444) 14%, transparent);
-}
-
-.icon-button.danger:disabled {
-  color: color-mix(in srgb, var(--clipboard-color-danger, #ef4444) 40%, transparent);
 }
 
 .icon-button span {

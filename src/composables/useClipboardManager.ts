@@ -7,6 +7,7 @@ import {
   onBeforeUnmount,
   onMounted,
   ref,
+  watch,
 } from 'vue'
 
 interface LoadHistoryOptions {
@@ -99,16 +100,29 @@ export function useClipboardManager() {
   const deletePending = ref(false)
   const applyPending = ref(false)
   const copyPending = ref(false)
+  const bulkDeletePending = ref(false)
+  const bulkFavoritePending = ref(false)
   const errorMessage = ref<string | null>(null)
 
   const page = ref(1)
   const total = ref(0)
   const pageSize = ref(0)
 
+  const multiSelectMode = ref(false)
+  const multiSelectedKeys = ref<string[]>([])
+
   let stopClipboardListener: (() => void) | null = null
   let stopHotkeys: (() => void) | undefined
 
   const canLoadMore = computed(() => clipboardItems.value.length < total.value)
+  const multiSelectedKeySet = computed(() => new Set(multiSelectedKeys.value))
+  const multiSelectedCount = computed(() => multiSelectedKeys.value.length)
+  const multiSelectedItems = computed(() => {
+    if (!multiSelectedKeys.value.length)
+      return []
+    const keySet = multiSelectedKeySet.value
+    return clipboardItems.value.filter(item => keySet.has(getItemKey(item)))
+  })
 
   const activeIndex = computed(() => {
     if (!selectedKey.value)
@@ -124,6 +138,42 @@ export function useClipboardManager() {
       return channel
     return null
   }
+
+  function clearMultiSelection() {
+    if (multiSelectedKeys.value.length)
+      multiSelectedKeys.value = []
+  }
+
+  function setMultiSelectMode(enabled: boolean) {
+    if (multiSelectMode.value === enabled)
+      return
+    multiSelectMode.value = enabled
+    if (!enabled)
+      clearMultiSelection()
+  }
+
+  function toggleMultiSelectMode() {
+    setMultiSelectMode(!multiSelectMode.value)
+  }
+
+  function toggleMultiSelectItem(item: PluginClipboardItem) {
+    const key = getItemKey(item)
+    const next = new Set(multiSelectedKeys.value)
+    if (next.has(key))
+      next.delete(key)
+    else
+      next.add(key)
+    multiSelectedKeys.value = Array.from(next)
+  }
+
+  watch(clipboardItems, () => {
+    if (!multiSelectedKeys.value.length)
+      return
+    const existingKeys = new Set(clipboardItems.value.map(entry => getItemKey(entry)))
+    const filtered = multiSelectedKeys.value.filter(key => existingKeys.has(key))
+    if (filtered.length !== multiSelectedKeys.value.length)
+      multiSelectedKeys.value = filtered
+  })
 
   function parseFileListFromItem(item: PluginClipboardItem): string[] {
     if (!item.content)
@@ -463,6 +513,73 @@ export function useClipboardManager() {
     await applyItem(item)
   }
 
+  async function bulkDeleteSelected() {
+    if (!multiSelectedKeys.value.length || bulkDeletePending.value)
+      return
+
+    bulkDeletePending.value = true
+    errorMessage.value = null
+
+    const targetKeys = new Set(multiSelectedKeys.value)
+    const itemsToDelete = clipboardItems.value.filter(item => targetKeys.has(getItemKey(item)) && item.id != null)
+
+    try {
+      for (const item of itemsToDelete)
+        await clipboard.deleteItem({ id: Number(item.id) })
+
+      clipboardItems.value = clipboardItems.value.filter(item => !targetKeys.has(getItemKey(item)))
+      const deletedCount = itemsToDelete.length
+      if (deletedCount)
+        total.value = Math.max(0, total.value - deletedCount)
+
+      multiSelectedKeys.value = []
+      if (selectedKey.value && targetKeys.has(selectedKey.value))
+        ensureSelection()
+      else
+        ensureSelection(selectedKey.value ?? undefined)
+    }
+    catch (error) {
+      errorMessage.value = formatError(error)
+    }
+    finally {
+      bulkDeletePending.value = false
+    }
+  }
+
+  async function bulkFavoriteSelected() {
+    if (!multiSelectedKeys.value.length || bulkFavoritePending.value)
+      return
+
+    bulkFavoritePending.value = true
+    errorMessage.value = null
+
+    const targetKeys = new Set(multiSelectedKeys.value)
+    const itemsToFavorite = clipboardItems.value.filter(item => targetKeys.has(getItemKey(item)) && item.id != null)
+
+    try {
+      for (const item of itemsToFavorite)
+        await clipboard.setFavorite({ id: Number(item.id), isFavorite: true })
+
+      clipboardItems.value = clipboardItems.value.map((item) => {
+        if (!targetKeys.has(getItemKey(item)))
+          return item
+        return {
+          ...item,
+          isFavorite: true,
+        }
+      })
+
+      if (selectedItem.value && targetKeys.has(getItemKey(selectedItem.value)))
+        selectedItem.value = { ...selectedItem.value, isFavorite: true }
+    }
+    catch (error) {
+      errorMessage.value = formatError(error)
+    }
+    finally {
+      bulkFavoritePending.value = false
+    }
+  }
+
   function handleClipboardChange(item: PluginClipboardItem) {
     const key = getItemKey(item)
     const index = clipboardItems.value.findIndex(existing => getItemKey(existing) === key)
@@ -514,11 +631,17 @@ export function useClipboardManager() {
     deletePending,
     applyPending,
     copyPending,
+    bulkDeletePending,
+    bulkFavoritePending,
     errorMessage,
     page,
     total,
     pageSize,
     canLoadMore,
+    multiSelectMode,
+    multiSelectedKeys,
+    multiSelectedCount,
+    multiSelectedItems,
     // getters
     activeIndex,
     // actions
@@ -529,6 +652,11 @@ export function useClipboardManager() {
     toggleFavorite,
     deleteSelected,
     clearHistory,
+    toggleMultiSelectMode,
+    toggleMultiSelectItem,
+    clearMultiSelection,
+    bulkDeleteSelected,
+    bulkFavoriteSelected,
     applyItem,
     copyItem,
     selectAndApply,

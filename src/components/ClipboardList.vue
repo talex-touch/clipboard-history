@@ -23,18 +23,24 @@ const props = defineProps<{
   pageSize: number
   isLoading: boolean
   isLoadingMore: boolean
-  isClearing: boolean
   canLoadMore: boolean
   errorMessage: string | null
-  formatTimestamp: (timestamp: PluginClipboardItem['timestamp']) => string
+  multiSelectMode: boolean
+  multiSelectedKeys: string[]
+  multiSelectedCount: number
+  bulkDeletePending: boolean
+  bulkFavoritePending: boolean
 }>()
 
 const emit = defineEmits<{
   (event: 'select', item: PluginClipboardItem): void
   (event: 'apply', item: PluginClipboardItem): void
   (event: 'refresh'): void
-  (event: 'clear'): void
   (event: 'loadMore'): void
+  (event: 'toggleMultiSelectMode'): void
+  (event: 'toggleMultiSelectItem', item: PluginClipboardItem): void
+  (event: 'bulkDeleteSelected'): void
+  (event: 'bulkFavoriteSelected'): void
 }>()
 
 const filterOptions: FilterOption[] = [
@@ -86,6 +92,7 @@ const activeFilterLabel = computed(() => {
 })
 
 const hasItems = computed(() => filterState.filteredItems.value.length > 0)
+const multiSelectedSet = computed(() => new Set(props.multiSelectedKeys))
 
 onClickOutside(filterControlsRef, () => {
   if (filterState.isPanelOpen.value)
@@ -109,10 +116,6 @@ function handleRefresh() {
   emit('refresh')
 }
 
-function handleClear() {
-  emit('clear')
-}
-
 function handleLoadMore() {
   emit('loadMore')
 }
@@ -126,6 +129,26 @@ function handleFilterChange(value: FilterValue) {
 function toggleFilterPanel() {
   filterState.togglePanel()
 }
+
+function handleToggleMultiSelectMode() {
+  emit('toggleMultiSelectMode')
+}
+
+function handleToggleMultiSelectItem(item: PluginClipboardItem) {
+  emit('toggleMultiSelectItem', item)
+}
+
+function handleBulkDeleteSelected() {
+  emit('bulkDeleteSelected')
+}
+
+function handleBulkFavoriteSelected() {
+  emit('bulkFavoriteSelected')
+}
+
+function isItemInMultiSelection(item: PluginClipboardItem) {
+  return multiSelectedSet.value.has(getItemKey(item))
+}
 </script>
 
 <template>
@@ -134,6 +157,7 @@ function toggleFilterPanel() {
     role="listbox"
     tabindex="0"
     :aria-activedescendant="selectedKey ? `clipboard-item-${selectedKey}` : undefined"
+    :aria-multiselectable="multiSelectMode || undefined"
   >
     <div v-if="errorMessage" class="list-error" role="alert">
       <span class="i-carbon-warning" aria-hidden="true" />
@@ -147,12 +171,37 @@ function toggleFilterPanel() {
           :is-loading="isLoading"
           :active-filter-label="activeFilterLabel"
           :has-active-filter="filterState.hasActiveFilter.value"
-          :is-clearing="isClearing"
           :has-items="hasItems"
+          :multi-select-mode="multiSelectMode"
+          :multi-selected-count="multiSelectedCount"
           @toggle-filter="toggleFilterPanel"
           @refresh="handleRefresh"
-          @clear="handleClear"
+          @toggle-multi-select="handleToggleMultiSelectMode"
         />
+
+        <div v-if="multiSelectMode" class="multi-select-toolbar">
+          <span class="toolbar-summary">已选择 {{ multiSelectedCount }} 项</span>
+          <div class="toolbar-actions">
+            <button
+              class="toolbar-button danger"
+              type="button"
+              :disabled="!multiSelectedCount || bulkDeletePending"
+              @click="handleBulkDeleteSelected"
+            >
+              <span class="i-carbon-trash-can" aria-hidden="true" />
+              {{ bulkDeletePending ? '删除中…' : '删除所选' }}
+            </button>
+            <button
+              class="toolbar-button"
+              type="button"
+              :disabled="!multiSelectedCount || bulkFavoritePending"
+              @click="handleBulkFavoriteSelected"
+            >
+              <span class="i-carbon-star" aria-hidden="true" />
+              {{ bulkFavoritePending ? '处理中…' : '批量收藏' }}
+            </button>
+          </div>
+        </div>
 
         <ClipboardListFilterPanel
           v-if="filterState.isPanelOpen.value"
@@ -175,9 +224,11 @@ function toggleFilterPanel() {
             :item="entry.item"
             :index="entry.globalIndex"
             :is-active="selectedKey === getItemKey(entry.item)"
-            :format-timestamp="formatTimestamp"
+            :is-multi-select-mode="multiSelectMode"
+            :is-multi-selected="isItemInMultiSelection(entry.item)"
             @select="handleSelect"
             @apply="handleApply"
+            @toggle-multi-select="handleToggleMultiSelectItem"
           />
         </ClipboardSection>
       </template>
@@ -206,5 +257,67 @@ function toggleFilterPanel() {
   color: var(--clipboard-color-danger-strong, #b91c1c);
   box-shadow: var(--clipboard-shadow-ghost);
   font-size: 0.82rem;
+}
+
+.multi-select-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 12px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  border: 1px solid var(--clipboard-border-color);
+  background: var(--clipboard-surface-strong);
+  color: var(--clipboard-text-secondary);
+}
+
+.multi-select-toolbar .toolbar-summary {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--clipboard-text-secondary);
+}
+
+.multi-select-toolbar .toolbar-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.multi-select-toolbar .toolbar-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--clipboard-border-color);
+  background: var(--clipboard-surface-base);
+  color: var(--clipboard-text-secondary);
+  font-size: 0.82rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.18s ease;
+}
+
+.multi-select-toolbar .toolbar-button:hover:not(:disabled) {
+  border-color: var(--clipboard-color-accent, #6366f1);
+  color: var(--clipboard-color-accent-strong, var(--clipboard-color-accent, #6366f1));
+  background: color-mix(in srgb, var(--clipboard-color-accent, #6366f1) 12%, transparent);
+}
+
+.multi-select-toolbar .toolbar-button.danger {
+  color: var(--clipboard-color-danger, #ef4444);
+  border-color: color-mix(in srgb, var(--clipboard-color-danger, #ef4444) 36%, transparent);
+}
+
+.multi-select-toolbar .toolbar-button.danger:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--clipboard-color-danger, #ef4444) 12%, transparent);
+  border-color: var(--clipboard-color-danger, #ef4444);
+  color: var(--clipboard-color-danger, #ef4444);
+}
+
+.multi-select-toolbar .toolbar-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
 }
 </style>
