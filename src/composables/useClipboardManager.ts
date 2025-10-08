@@ -9,6 +9,7 @@ import {
   ref,
   watch,
 } from 'vue'
+import { toast } from 'vue-sonner'
 
 interface LoadHistoryOptions {
   reset?: boolean
@@ -103,6 +104,14 @@ export function useClipboardManager() {
   const bulkDeletePending = ref(false)
   const bulkFavoritePending = ref(false)
   const errorMessage = ref<string | null>(null)
+
+  if (!import.meta.env.SSR) {
+    watch(errorMessage, (message) => {
+      if (!message)
+        return
+      toast.error(message)
+    })
+  }
 
   const page = ref(1)
   const total = ref(0)

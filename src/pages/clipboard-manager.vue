@@ -21,7 +21,6 @@ const {
   deletePending,
   applyPending,
   copyPending,
-  errorMessage,
   total,
   pageSize,
   canLoadMore,
@@ -58,7 +57,6 @@ const {
           :is-loading="isLoading"
           :is-loading-more="isLoadingMore"
           :can-load-more="canLoadMore"
-          :error-message="errorMessage"
           :multi-select-mode="multiSelectMode"
           :multi-selected-keys="multiSelectedKeys"
           :multi-selected-count="multiSelectedCount"

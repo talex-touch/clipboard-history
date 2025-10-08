@@ -24,7 +24,6 @@ const props = defineProps<{
   isLoading: boolean
   isLoadingMore: boolean
   canLoadMore: boolean
-  errorMessage: string | null
   multiSelectMode: boolean
   multiSelectedKeys: string[]
   multiSelectedCount: number
@@ -159,11 +158,6 @@ function isItemInMultiSelection(item: PluginClipboardItem) {
     :aria-activedescendant="selectedKey ? `clipboard-item-${selectedKey}` : undefined"
     :aria-multiselectable="multiSelectMode || undefined"
   >
-    <div v-if="errorMessage" class="list-error" role="alert">
-      <span class="i-carbon-warning" aria-hidden="true" />
-      <span>{{ errorMessage }}</span>
-    </div>
-
     <div ref="scrollAreaRef" class="h-full overflow-y-auto" tabindex="-1">
       <div ref="filterControlsRef" class="relative px-2 pb-3">
         <ClipboardListHeader
@@ -246,20 +240,6 @@ function isItemInMultiSelection(item: PluginClipboardItem) {
 </template>
 
 <style scoped>
-.list-error {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 10px 14px;
-  border-radius: 16px;
-  border: 1px solid var(--clipboard-border-strong);
-  background: var(--clipboard-color-danger-soft-fallback);
-  background: color-mix(in srgb, var(--clipboard-color-danger, #ef4444) 14%, transparent);
-  color: var(--clipboard-color-danger-strong, #b91c1c);
-  box-shadow: var(--clipboard-shadow-ghost);
-  font-size: 0.82rem;
-}
-
 .multi-select-toolbar {
   display: flex;
   align-items: center;

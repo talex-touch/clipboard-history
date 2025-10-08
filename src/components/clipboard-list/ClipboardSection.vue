@@ -13,11 +13,59 @@ const props = withDefaults(
 )
 
 const isCollapsed = ref(false)
+const sectionRef = ref<HTMLElement | null>(null)
+
+const DOUBLE_TAP_INTERVAL = 320
+let lastTouchTimestamp = 0
 
 function toggleCollapse() {
   if (props.collapseDisabled)
     return
   isCollapsed.value = !isCollapsed.value
+}
+
+function scrollToSectionTop() {
+  const section = sectionRef.value
+  if (!section)
+    return
+
+  section.scrollIntoView({ behavior: 'smooth', block: 'start' })
+}
+
+function isInteractiveTarget(target: EventTarget | null) {
+  return target instanceof HTMLElement && Boolean(target.closest('button, a, input, textarea, [contenteditable="true"]'))
+}
+
+function isWithinSectionHeader(target: EventTarget | null) {
+  return target instanceof HTMLElement && Boolean(target.closest('.section-header'))
+}
+
+function handleHeaderDoubleClick(event: MouseEvent) {
+  const target = event.target
+  if (!isWithinSectionHeader(target) || isInteractiveTarget(target))
+    return
+  scrollToSectionTop()
+}
+
+function handleHeaderTouchEnd(event: TouchEvent) {
+  const target = event.target
+  if (!isWithinSectionHeader(target)) {
+    lastTouchTimestamp = 0
+    return
+  }
+
+  if (isInteractiveTarget(target))
+    return
+
+  const now = performance.now()
+  if (now - lastTouchTimestamp < DOUBLE_TAP_INTERVAL) {
+    event.preventDefault()
+    scrollToSectionTop()
+    lastTouchTimestamp = 0
+    return
+  }
+
+  lastTouchTimestamp = now
 }
 
 watch(
@@ -129,9 +177,12 @@ function collapseLeave(el: HTMLElement) {
 
 <template>
   <section
+    ref="sectionRef"
     class="flex flex-col select-none"
     :class="collapseDisabled ? 'cursor-default' : 'cursor-pointer'"
     role="group"
+    @dblclick="handleHeaderDoubleClick"
+    @touchend="handleHeaderTouchEnd"
   >
     <header class="section-header flex items-center justify-between gap-2 p-2">
       <h3>{{ title }} ({{ count }}条)</h3>

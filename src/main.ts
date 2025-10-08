@@ -8,6 +8,7 @@ import App from './App.vue'
 import '@unocss/reset/tailwind.css'
 import './styles/main.css'
 import 'uno.css'
+import 'vue-sonner/style.css'
 
 // https://github.com/antfu/vite-ssg
 export const createApp = ViteSSG(

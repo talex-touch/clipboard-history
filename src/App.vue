@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { Toaster } from 'vue-sonner'
+
 useHead({
   title: 'ClipboardManager',
   meta: [
@@ -23,4 +25,5 @@ useHead({
 
 <template>
   <RouterView />
+  <Toaster position="top-center" :theme="isDark ? 'dark' : 'light'" />
 </template>
