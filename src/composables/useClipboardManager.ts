@@ -1,5 +1,6 @@
 import type { PluginClipboardItem } from '@talex-touch/utils/plugin/sdk/types'
 import { useClipboardHistory } from '@talex-touch/utils/plugin/sdk'
+import structuredClonePolyfill from '@ungap/structured-clone'
 import { useEventListener } from '@vueuse/core'
 import {
   computed,
@@ -7,9 +8,11 @@ import {
   onBeforeUnmount,
   onMounted,
   ref,
+  toRaw,
   watch,
 } from 'vue'
 import { toast } from 'vue-sonner'
+import { ensureTFileUrl } from '~/utils/tfile'
 
 interface LoadHistoryOptions {
   reset?: boolean
@@ -149,6 +152,35 @@ export function useClipboardManager() {
     return null
   }
 
+  function cloneClipboardItem(item: PluginClipboardItem): PluginClipboardItem {
+    const rawItem = toRaw(item)
+    return structuredClonePolyfill(rawItem)
+  }
+
+  async function hideCoreBoxWindow() {
+    try {
+      const channel = resolvePluginChannel()
+      if (!channel)
+        return
+      await channel.send('hide')
+    }
+    catch (error) {
+      console.error('[ClipboardManager] Failed to hide CoreBox', error)
+    }
+  }
+
+  async function resolveImageBlob(item: PluginClipboardItem): Promise<Blob> {
+    const content = (item.content ?? '').trim()
+    if (!content)
+      throw new Error('无法解析图片内容')
+
+    const source = content.startsWith('data:') ? content : ensureTFileUrl(content)
+    const response = await fetch(source)
+    if (!response.ok)
+      throw new Error(`无法读取图片数据（${response.status}）`)
+    return await response.blob()
+  }
+
   function clearMultiSelection() {
     if (multiSelectedKeys.value.length)
       multiSelectedKeys.value = []
@@ -203,12 +235,11 @@ export function useClipboardManager() {
     if (typeof navigator === 'undefined' || !navigator.clipboard)
       throw new Error('当前环境暂不支持直接写入系统剪贴板')
 
-    if (item.type === 'image' && item.content?.startsWith('data:')) {
+    if (item.type === 'image') {
       if (typeof ClipboardItem === 'undefined')
         throw new Error('当前浏览器不支持写入图片到剪贴板')
 
-      const response = await fetch(item.content)
-      const blob = await response.blob()
+      const blob = await resolveImageBlob(item)
       const clipboardItem = new ClipboardItem({ [blob.type || 'image/png']: blob })
       await navigator.clipboard.write([clipboardItem])
       return
@@ -321,10 +352,25 @@ export function useClipboardManager() {
       selectByIndex(index)
   }
 
-  function handleHotkeys(event: KeyboardEvent) {
+  async function handleHotkeys(event: KeyboardEvent) {
     const target = event.target as HTMLElement | null
     if (target?.tagName === 'INPUT' || target?.tagName === 'TEXTAREA' || target?.isContentEditable)
       return
+
+    if (event.key === 'Enter') {
+      event.preventDefault()
+      if (event.metaKey || event.ctrlKey) {
+        const applied = await applyItem()
+        if (applied)
+          await hideCoreBoxWindow()
+      }
+      else {
+        const copied = await copyItem()
+        if (copied)
+          await hideCoreBoxWindow()
+      }
+      return
+    }
 
     handleArrowNavigation(event)
     handleQuickSelect(event)
@@ -416,8 +462,13 @@ export function useClipboardManager() {
     errorMessage.value = null
 
     try {
+      const payload = cloneClipboardItem(item)
+
       if (typeof clipboard.applyToActiveApp === 'function') {
-        const success = await clipboard.applyToActiveApp({ item })
+        const success = await clipboard.applyToActiveApp({
+          item: payload,
+          hideCoreBox: true,
+        })
         if (!success)
           throw new Error('自动粘贴失败')
         return true
@@ -427,13 +478,20 @@ export function useClipboardManager() {
       if (!channel)
         throw new Error('无法调用自动粘贴通道')
 
-      const response = await channel.send('clipboard:apply-to-active-app', { item })
+      const response = await channel.send('clipboard:apply-to-active-app', {
+        item: payload,
+        hideCoreBox: true,
+      })
       if (response && typeof response === 'object' && 'success' in response && !response.success)
         throw new Error((response as { message?: string }).message ?? '自动粘贴失败')
 
       return true
     }
     catch (error) {
+      console.error('[ClipboardManager] Failed to auto apply clipboard item', {
+        item,
+        error,
+      })
       errorMessage.value = formatError(error)
       return false
     }
@@ -450,10 +508,15 @@ export function useClipboardManager() {
     errorMessage.value = null
 
     try {
-      await writeClipboardFromItem(item)
+      const payload = cloneClipboardItem(item)
+      await writeClipboardFromItem(payload)
       return true
     }
     catch (error) {
+      console.error('[ClipboardManager] Failed to copy clipboard item', {
+        item,
+        error,
+      })
       errorMessage.value = formatError(error)
       return false
     }
@@ -539,11 +602,6 @@ export function useClipboardManager() {
 
   function selectItem(item: PluginClipboardItem) {
     setSelection(item)
-  }
-
-  async function selectAndApply(item: PluginClipboardItem) {
-    setSelection(item)
-    await applyItem(item)
   }
 
   async function bulkDeleteSelected() {
@@ -693,7 +751,6 @@ export function useClipboardManager() {
     bulkFavoriteSelected,
     applyItem,
     copyItem,
-    selectAndApply,
     formatTimestamp,
     loadHistory,
     getItemKey,

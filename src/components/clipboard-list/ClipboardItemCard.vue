@@ -14,7 +14,6 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   (event: 'select', item: PluginClipboardItem): void
-  (event: 'apply', item: PluginClipboardItem): void
   (event: 'toggleMultiSelect', item: PluginClipboardItem): void
 }>()
 
@@ -148,7 +147,6 @@ function handleClick() {
     return
   }
   emit('select', props.item)
-  emit('apply', props.item)
 }
 </script>
 

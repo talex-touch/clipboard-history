@@ -38,7 +38,6 @@ const {
   bulkDeleteSelected,
   bulkFavoriteSelected,
   selectItem,
-  selectAndApply,
   applyItem,
   copyItem,
   formatTimestamp,
@@ -64,7 +63,6 @@ const {
           :bulk-favorite-pending="bulkFavoritePending"
           v-on="{
             select: selectItem,
-            apply: selectAndApply,
             refresh: refreshHistory,
             loadMore,
             toggleMultiSelectMode,

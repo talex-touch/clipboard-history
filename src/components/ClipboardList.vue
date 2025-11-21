@@ -33,7 +33,6 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   (event: 'select', item: PluginClipboardItem): void
-  (event: 'apply', item: PluginClipboardItem): void
   (event: 'refresh'): void
   (event: 'loadMore'): void
   (event: 'toggleMultiSelectMode'): void
@@ -108,10 +107,6 @@ useEventListener(document, 'keydown', (event: KeyboardEvent) => {
 
 function handleSelect(item: PluginClipboardItem) {
   emit('select', item)
-}
-
-function handleApply(item: PluginClipboardItem) {
-  emit('apply', item)
 }
 
 function handleRefresh() {
@@ -258,7 +253,6 @@ const canDisplayLoadMore = computed(() => props.canLoadMore && !shouldDisableLoa
             :is-multi-select-mode="multiSelectMode"
             :is-multi-selected="isItemInMultiSelection(entry.item)"
             @select="handleSelect"
-            @apply="handleApply"
             @toggle-multi-select="handleToggleMultiSelectItem"
           />
         </ClipboardSection>
