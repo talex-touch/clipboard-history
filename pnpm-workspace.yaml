@@ -2,20 +2,20 @@ packages: []
 
 catalog:
   '@talex-touch/unplugin-export-plugin': ^1.2.7
-  '@talex-touch/utils': ^1.0.32
+  '@talex-touch/utils': ^1.0.34
 
 catalogs:
   build:
     '@intlify/unplugin-vue-i18n': ^6.0.8
-    '@shikijs/markdown-it': ^3.15.0
-    '@unocss/eslint-config': ^66.5.7
+    '@shikijs/markdown-it': ^3.17.0
+    '@unocss/eslint-config': ^66.5.9
     '@vitejs/plugin-vue': ^5.2.4
     beasties: ^0.2.0
     markdown-it-link-attributes: ^4.0.1
     rollup: ^4.53.3
-    shiki: ^3.15.0
-    unocss: ^66.5.7
-    unplugin: ^2.3.10
+    shiki: ^3.17.0
+    unocss: ^66.5.9
+    unplugin: ^2.3.11
     unplugin-auto-import: ^19.3.0
     unplugin-vue-components: ^28.8.0
     unplugin-vue-macros: ^2.14.5
@@ -29,6 +29,9 @@ catalogs:
     vite-plugin-vue-layouts: ^0.11.0
     vite-ssg: ^26.1.1
     vite-ssg-sitemap: ^0.8.1
+  conflicts_@talex-touch/unplugin-export-plugin_h1_2_8:
+    '@talex-touch/unplugin-export-plugin': ^1.2.8
+
   dev:
     '@antfu/eslint-config': ^4.19.0
     '@iconify-json/carbon': ^1.2.14
@@ -42,24 +45,23 @@ catalogs:
     https-localhost: ^4.7.1
     lint-staged: ^15.5.2
     simple-git-hooks: ^2.13.1
-    taze: ^19.9.0
+    taze: ^19.9.2
     typescript: ^5.9.3
     vitest: ^3.2.4
     vue-tsc: ^2.2.12
   frontend:
     '@unhead/vue': ^2.0.19
-    '@unocss/reset': ^66.5.7
+    '@unocss/reset': ^66.5.9
     '@vueuse/core': ^13.9.0
     nprogress: ^0.2.0
     pinia: ^3.0.4
-    vue: ^3.5.24
-    vue-i18n: ^11.1.12
+    vue: ^3.5.25
+    vue-i18n: ^11.2.2
     vue-router: ^4.6.3
     vue-sonner: ^2.0.9
   types:
     '@types/markdown-it-link-attributes': ^3.0.5
     '@types/nprogress': ^0.2.3
-
 onlyBuiltDependencies:
   - cypress
   - electron

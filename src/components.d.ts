@@ -13,18 +13,13 @@ declare module 'vue' {
     ClipboardList: typeof import('./components/ClipboardList.vue')['default']
     ClipboardListFilterPanel: typeof import('./components/clipboard-list/ClipboardListFilterPanel.vue')['default']
     ClipboardListHeader: typeof import('./components/clipboard-list/ClipboardListHeader.vue')['default']
-    ClipboardListToolbar: typeof import('./components/clipboard-list/ClipboardListToolbar.vue')['default']
     ClipboardLoadMore: typeof import('./components/clipboard-list/ClipboardLoadMore.vue')['default']
     ClipboardPreview: typeof import('./components/ClipboardPreview.vue')['default']
     ClipboardSection: typeof import('./components/clipboard-list/ClipboardSection.vue')['default']
     FullscreenLoadingOverlay: typeof import('./components/FullscreenLoadingOverlay.vue')['default']
     PageHolder: typeof import('./components/PageHolder.vue')['default']
-    README: typeof import('./components/README.md')['default']
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterView: typeof import('vue-router')['RouterView']
     SyncIndicator: typeof import('./components/SyncIndicator.vue')['default']
-    TheCounter: typeof import('./components/TheCounter.vue')['default']
-    TheFooter: typeof import('./components/TheFooter.vue')['default']
-    TheInput: typeof import('./components/TheInput.vue')['default']
   }
 }
