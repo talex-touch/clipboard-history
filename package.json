@@ -17,7 +17,6 @@
     "sizecheck": "npx vite-bundle-visualizer"
   },
   "dependencies": {
-    "@talex-touch/unplugin-export-plugin": "catalog:conflicts_conflicts_@talex-touch/unplugin-export-plugin_h1_2_8_h1_2_11",
     "@talex-touch/utils": "catalog:",
     "@unhead/vue": "catalog:frontend",
     "@unocss/reset": "catalog:frontend",
@@ -34,6 +33,7 @@
     "@iconify-json/carbon": "catalog:dev",
     "@intlify/unplugin-vue-i18n": "catalog:build",
     "@shikijs/markdown-it": "catalog:build",
+    "@talex-touch/unplugin-export-plugin": "catalog:",
     "@types/markdown-it-link-attributes": "catalog:types",
     "@types/nprogress": "catalog:types",
     "@unocss/eslint-config": "catalog:build",

@@ -100,10 +100,12 @@ onClickOutside(filterControlsRef, () => {
     filterState.closePanel()
 })
 
-useEventListener(document, 'keydown', (event: KeyboardEvent) => {
-  if (event.key === 'Escape' && filterState.isPanelOpen.value)
-    filterState.closePanel()
-})
+if (typeof document !== 'undefined') {
+  useEventListener(document, 'keydown', (event: KeyboardEvent) => {
+    if (event.key === 'Escape' && filterState.isPanelOpen.value)
+      filterState.closePanel()
+  })
+}
 
 function handleSelect(item: PluginClipboardItem) {
   emit('select', item)

@@ -14,6 +14,38 @@ import {
 import { toast } from 'vue-sonner'
 import { ensureTFileUrl } from '~/utils/tfile'
 
+type ClipboardHistoryClient = ReturnType<typeof useClipboardHistory> & {
+  applyToActiveApp?: (options: { item?: PluginClipboardItem }) => Promise<boolean>
+}
+
+function createClipboardHistoryStub(): ClipboardHistoryClient {
+  const asyncNoop = async () => {}
+  const dispose = () => {}
+
+  return {
+    async getHistory() {
+      return {
+        history: [],
+        page: 1,
+        pageSize: 0,
+        total: 0,
+      }
+    },
+    async setFavorite() {
+      await asyncNoop()
+    },
+    async deleteItem() {
+      await asyncNoop()
+    },
+    async clearHistory() {
+      await asyncNoop()
+    },
+    onDidChange() {
+      return dispose
+    },
+  } as ClipboardHistoryClient
+}
+
 interface LoadHistoryOptions {
   reset?: boolean
   showInitialSpinner?: boolean
@@ -90,9 +122,9 @@ function formatTimestamp(timestamp: PluginClipboardItem['timestamp']) {
 }
 
 export function useClipboardManager() {
-  const clipboard = useClipboardHistory() as ReturnType<typeof useClipboardHistory> & {
-    applyToActiveApp?: (options: { item?: PluginClipboardItem }) => Promise<boolean>
-  }
+  const clipboard: ClipboardHistoryClient = import.meta.env.SSR
+    ? createClipboardHistoryStub()
+    : (useClipboardHistory() as ClipboardHistoryClient)
 
   const clipboardItems = ref<PluginClipboardItem[]>([])
   const selectedItem = ref<PluginClipboardItem | null>(null)
