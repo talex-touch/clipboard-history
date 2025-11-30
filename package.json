@@ -3,7 +3,7 @@
   "private": true,
   "packageManager": "pnpm@10.24.0",
   "scripts": {
-    "build": "vite-ssg build",
+    "build": "vite-ssg build && tuff builder",
     "dev": "vite --port 3488 --open",
     "lint": "eslint .",
     "preview": "vite preview",
