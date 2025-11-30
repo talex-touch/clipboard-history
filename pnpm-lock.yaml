@@ -165,8 +165,8 @@ importers:
   .:
     dependencies:
       '@talex-touch/unplugin-export-plugin':
-        specifier: ^1.2.8
-        version: 1.2.8(chalk@5.4.1)(cli-progress@3.12.0)(compressing@1.10.3)(debug@4.4.3)(electron@37.6.0)(fs-extra@9.1.0)(pathe@2.0.3)(unplugin@2.3.11)(vue@3.5.25(typescript@5.9.3))
+        specifier: ^1.2.11
+        version: 1.2.11(chalk@5.4.1)(cli-progress@3.12.0)(compressing@1.10.3)(debug@4.4.3)(electron@37.6.0)(fs-extra@9.1.0)(pathe@2.0.3)(unplugin@2.3.11)(vue@3.5.25(typescript@5.9.3))
       '@talex-touch/utils':
         specifier: 'catalog:'
         version: 1.0.34(electron@37.6.0)(vue@3.5.25(typescript@5.9.3))
@@ -1894,8 +1894,9 @@ packages:
     resolution: {integrity: sha512-4BAffykYOgO+5nzBWYwE3W90sBgLJoUPRWWcL8wlyiM8IB8ipJz3UMJ9KXQd1RKQXpKp8Tutn80HZtWsu2u76w==}
     engines: {node: '>=10'}
 
-  '@talex-touch/unplugin-export-plugin@1.2.8':
-    resolution: {integrity: sha512-7ov6s2ZOKQupZrZHcLmbzi0NRsUSENK3fsP499tZtodzPU2m/NrRLhuT6cHfPjA6RiTrjQm1k13XoUu+gQameg==}
+  '@talex-touch/unplugin-export-plugin@1.2.11':
+    resolution: {integrity: sha512-BI/FXfHfw2+HZoENzWEFE1vzVn40zNxs8WkF4W5ibkGTkClpO+Gr7n5oKQnXuB7fRnFJBv1QtjZcEtas68PS/w==}
+    hasBin: true
     peerDependencies:
       chalk: ^5.6.0
       cli-progress: ^3.12.0
@@ -8235,7 +8236,7 @@ snapshots:
     dependencies:
       defer-to-connect: 2.0.1
 
-  '@talex-touch/unplugin-export-plugin@1.2.8(chalk@5.4.1)(cli-progress@3.12.0)(compressing@1.10.3)(debug@4.4.3)(electron@37.6.0)(fs-extra@9.1.0)(pathe@2.0.3)(unplugin@2.3.11)(vue@3.5.25(typescript@5.9.3))':
+  '@talex-touch/unplugin-export-plugin@1.2.11(chalk@5.4.1)(cli-progress@3.12.0)(compressing@1.10.3)(debug@4.4.3)(electron@37.6.0)(fs-extra@9.1.0)(pathe@2.0.3)(unplugin@2.3.11)(vue@3.5.25(typescript@5.9.3))':
     dependencies:
       '@talex-touch/utils': 1.0.34(electron@37.6.0)(vue@3.5.25(typescript@5.9.3))
       chalk: 5.4.1

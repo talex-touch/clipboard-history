@@ -32,6 +32,10 @@ catalogs:
   conflicts_@talex-touch/unplugin-export-plugin_h1_2_8:
     '@talex-touch/unplugin-export-plugin': ^1.2.8
 
+  conflicts_conflicts_@talex-touch/unplugin-export-plugin_h1_2_8_h1_2_10:
+    '@talex-touch/unplugin-export-plugin': ^1.2.10
+  conflicts_conflicts_@talex-touch/unplugin-export-plugin_h1_2_8_h1_2_11:
+    '@talex-touch/unplugin-export-plugin': ^1.2.11
   dev:
     '@antfu/eslint-config': ^4.19.0
     '@iconify-json/carbon': ^1.2.14
