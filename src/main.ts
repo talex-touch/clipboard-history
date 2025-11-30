@@ -12,15 +12,18 @@ import 'uno.css'
 import 'vue-sonner/style.css'
 
 // https://github.com/antfu/vite-ssg
+const appBase = import.meta.env.BASE_URL || '/'
+const routerBase = appBase.startsWith('.') ? '/' : appBase
+
 const history = import.meta.env.SSR
-  ? createMemoryHistory(import.meta.env.BASE_URL)
-  : createWebHashHistory(import.meta.env.BASE_URL)
+  ? createMemoryHistory(routerBase)
+  : createWebHashHistory(routerBase)
 
 export const createApp = ViteSSG(
   App,
   {
     routes: setupLayouts(routes),
-    base: import.meta.env.BASE_URL,
+    base: routerBase,
     history,
   },
   (ctx) => {
