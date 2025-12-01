@@ -9,7 +9,7 @@
   "description": "一款全平台剪贴板历史记录插件，从 tuff 核心提取剪贴板历史。",
   "dev": {
     "enable": true,
-    "address": "http://localhost:3488/",
+    "address": "http://localhost:3488/#/",
     "source": true
   },
   "features": [

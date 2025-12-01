@@ -66,10 +66,6 @@ catalogs:
     vite-ssg-sitemap:
       specifier: ^0.8.1
       version: 0.8.1
-  default:
-    '@talex-touch/utils':
-      specifier: ^1.0.34
-      version: 1.0.34
   dev:
     '@antfu/eslint-config':
       specifier: ^4.19.0
@@ -165,8 +161,8 @@ importers:
   .:
     dependencies:
       '@talex-touch/utils':
-        specifier: 'catalog:'
-        version: 1.0.34(electron@37.6.0)(vue@3.5.25(typescript@5.9.3))
+        specifier: ^1.0.37
+        version: 1.0.37(electron@37.6.0)(vue@3.5.25(typescript@5.9.3))
       '@unhead/vue':
         specifier: catalog:frontend
         version: 2.0.19(vue@3.5.25(typescript@5.9.3))
@@ -176,6 +172,9 @@ importers:
       '@vueuse/core':
         specifier: catalog:frontend
         version: 13.9.0(vue@3.5.25(typescript@5.9.3))
+      latest:
+        specifier: link:@talex-touch/utils/latest
+        version: link:@talex-touch/utils/latest
       nprogress:
         specifier: catalog:frontend
         version: 0.2.0
@@ -208,8 +207,8 @@ importers:
         specifier: catalog:build
         version: 3.17.0(markdown-it-async@2.2.0)
       '@talex-touch/unplugin-export-plugin':
-        specifier: ^1.2.13
-        version: 1.2.13(chalk@5.4.1)(cli-progress@3.12.0)(compressing@1.10.3)(debug@4.4.3)(electron@37.6.0)(fs-extra@9.1.0)(pathe@2.0.3)(unplugin@2.3.11)(vue@3.5.25(typescript@5.9.3))
+        specifier: ^1.2.14
+        version: 1.2.14(chalk@5.4.1)(cli-progress@3.12.0)(compressing@1.10.3)(debug@4.4.3)(electron@37.6.0)(fs-extra@9.1.0)(pathe@2.0.3)(unplugin@2.3.11)(vue@3.5.25(typescript@5.9.3))
       '@types/markdown-it-link-attributes':
         specifier: catalog:types
         version: 3.0.5
@@ -1894,8 +1893,8 @@ packages:
     resolution: {integrity: sha512-4BAffykYOgO+5nzBWYwE3W90sBgLJoUPRWWcL8wlyiM8IB8ipJz3UMJ9KXQd1RKQXpKp8Tutn80HZtWsu2u76w==}
     engines: {node: '>=10'}
 
-  '@talex-touch/unplugin-export-plugin@1.2.13':
-    resolution: {integrity: sha512-zMcnP3hTQ7/Rw2Wwu9KxYOjfl78qT16jnJ72KaEwq8debTGnderD2VsYB3+h9XLM9Nuybnt7Bop3nBddrtRuBg==}
+  '@talex-touch/unplugin-export-plugin@1.2.14':
+    resolution: {integrity: sha512-Loy2n/GJVO2WxzDvJtuQ0HkKTOMjid/rV1YZncj6dqd/nG/9cIw/J4pjaTb/kDXWmjHWtES3Dq5t9JmQc7Ce+w==}
     hasBin: true
     peerDependencies:
       chalk: ^5.6.0
@@ -1906,8 +1905,8 @@ packages:
       pathe: ^1.1.2
       unplugin: ^2.3.11
 
-  '@talex-touch/utils@1.0.34':
-    resolution: {integrity: sha512-PKsjPpvn8aPy5ljCgIYlvpB9KL9p98BtwanhznX01qef6HminNyihwVhGpD9Vs708wc0G5MAN1h/Ua3bSImJ8g==}
+  '@talex-touch/utils@1.0.37':
+    resolution: {integrity: sha512-v3O3rg5Rm+cDCfBcvhWXMnCwvHVHca7V1FnCIwgROe3fL8KTQWhqOKelF9+vagThhWamd7oAoikiuYJa6p0RSw==}
     peerDependencies:
       electron: ^37.2.4
       vue: ^3.5.15
@@ -8236,9 +8235,9 @@ snapshots:
     dependencies:
       defer-to-connect: 2.0.1
 
-  '@talex-touch/unplugin-export-plugin@1.2.13(chalk@5.4.1)(cli-progress@3.12.0)(compressing@1.10.3)(debug@4.4.3)(electron@37.6.0)(fs-extra@9.1.0)(pathe@2.0.3)(unplugin@2.3.11)(vue@3.5.25(typescript@5.9.3))':
+  '@talex-touch/unplugin-export-plugin@1.2.14(chalk@5.4.1)(cli-progress@3.12.0)(compressing@1.10.3)(debug@4.4.3)(electron@37.6.0)(fs-extra@9.1.0)(pathe@2.0.3)(unplugin@2.3.11)(vue@3.5.25(typescript@5.9.3))':
     dependencies:
-      '@talex-touch/utils': 1.0.34(electron@37.6.0)(vue@3.5.25(typescript@5.9.3))
+      '@talex-touch/utils': 1.0.37(electron@37.6.0)(vue@3.5.25(typescript@5.9.3))
       chalk: 5.4.1
       cli-progress: 3.12.0
       compressing: 1.10.3
@@ -8250,7 +8249,7 @@ snapshots:
       - electron
       - vue
 
-  '@talex-touch/utils@1.0.34(electron@37.6.0)(vue@3.5.25(typescript@5.9.3))':
+  '@talex-touch/utils@1.0.37(electron@37.6.0)(vue@3.5.25(typescript@5.9.3))':
     dependencies:
       '@vueuse/core': 13.9.0(vue@3.5.25(typescript@5.9.3))
       electron: 37.6.0

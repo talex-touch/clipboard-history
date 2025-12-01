@@ -1,7 +1,7 @@
 packages: []
 
 catalog:
-  '@talex-touch/unplugin-export-plugin': ^1.2.11
+  '@talex-touch/unplugin-export-plugin': ^1.2.14
   '@talex-touch/utils': ^1.0.34
 
 catalogs:
@@ -29,8 +29,12 @@ catalogs:
     vite-plugin-vue-layouts: ^0.11.0
     vite-ssg: ^26.1.1
     vite-ssg-sitemap: ^0.8.1
-  conflicts_@talex-touch/unplugin-export-plugin_h1_2_13:
-    '@talex-touch/unplugin-export-plugin': ^1.2.13
+  conflicts_@talex-touch/utils_h1_0_35:
+    '@talex-touch/utils': ^1.0.35
+  conflicts_conflicts_@talex-touch/utils_h1_0_35_h1_0_36:
+    '@talex-touch/utils': ^1.0.36
+  conflicts_conflicts_@talex-touch/utils_h1_0_35_h1_0_37:
+    '@talex-touch/utils': ^1.0.37
   dev:
     '@antfu/eslint-config': ^4.19.0
     '@iconify-json/carbon': ^1.2.14
