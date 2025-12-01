@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import type { PluginClipboardItem } from '@talex-touch/utils/plugin/sdk/types'
 import { computed } from 'vue'
+import { getItemKey } from '~/composables/clipboardUtils'
 import { useClipboardContentInfo } from '~/composables/useClipboardContentInfo'
-import { getItemKey } from '~/composables/useClipboardManager'
 
 const props = defineProps<{
   item: PluginClipboardItem

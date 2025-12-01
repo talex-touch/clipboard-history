@@ -10,8 +10,8 @@ import ClipboardListFilterPanel from '~/components/clipboard-list/ClipboardListF
 import ClipboardListHeader from '~/components/clipboard-list/ClipboardListHeader.vue'
 import ClipboardLoadMore from '~/components/clipboard-list/ClipboardLoadMore.vue'
 import ClipboardSection from '~/components/clipboard-list/ClipboardSection.vue'
+import { getItemKey } from '~/composables/clipboardUtils'
 import { useClipboardFilters } from '~/composables/useClipboardFilters'
-import { getItemKey } from '~/composables/useClipboardManager'
 import { useClipboardSections } from '~/composables/useClipboardSections'
 
 type FilterValue = ReturnType<typeof useClipboardFilters>['selectedFilter']['value']

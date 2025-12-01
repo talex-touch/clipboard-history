@@ -9,88 +9,56 @@ defineOptions({
   name: 'ClipboardManagerPage',
 })
 
-const clipboardManager = useClipboardManager()
-
-const {
-  clipboardItems,
-  selectedItem,
-  selectedKey,
-  isLoading,
-  isLoadingMore,
-  favoritePending,
-  deletePending,
-  applyPending,
-  copyPending,
-  total,
-  pageSize,
-  canLoadMore,
-  multiSelectMode,
-  multiSelectedKeys,
-  multiSelectedCount,
-  bulkDeletePending,
-  bulkFavoritePending,
-  refreshHistory,
-  loadMore,
-  toggleFavorite,
-  deleteSelected,
-  toggleMultiSelectMode,
-  toggleMultiSelectItem,
-  bulkDeleteSelected,
-  bulkFavoriteSelected,
-  selectItem,
-  applyItem,
-  copyItem,
-  formatTimestamp,
-} = clipboardManager
+const manager = useClipboardManager()
 </script>
 
 <template>
-  <div class="ClipboardManagerPage" :class="{ 'is-loading': isLoading }">
-    <PageHolder class="manager-holder" :class="{ blurred: isLoading }">
+  <div class="ClipboardManagerPage" :class="{ 'is-loading': manager?.isLoading.value }">
+    <PageHolder v-if="manager" class="manager-holder" :class="{ blurred: manager.isLoading.value }">
       <template #aside>
         <ClipboardList
-          :items="clipboardItems"
-          :selected-key="selectedKey"
-          :total="total"
-          :page-size="pageSize"
-          :is-loading="isLoading"
-          :is-loading-more="isLoadingMore"
-          :can-load-more="canLoadMore"
-          :multi-select-mode="multiSelectMode"
-          :multi-selected-keys="multiSelectedKeys"
-          :multi-selected-count="multiSelectedCount"
-          :bulk-delete-pending="bulkDeletePending"
-          :bulk-favorite-pending="bulkFavoritePending"
+          :items="manager.clipboardItems.value"
+          :selected-key="manager.selectedKey.value"
+          :total="manager.total.value"
+          :page-size="manager.pageSize.value"
+          :is-loading="manager.isLoading.value"
+          :is-loading-more="manager.isLoadingMore.value"
+          :can-load-more="manager.canLoadMore.value"
+          :multi-select-mode="manager.multiSelectMode.value"
+          :multi-selected-keys="manager.multiSelectedKeys.value"
+          :multi-selected-count="manager.multiSelectedCount.value"
+          :bulk-delete-pending="manager.bulkDeletePending.value"
+          :bulk-favorite-pending="manager.bulkFavoritePending.value"
           v-on="{
-            select: selectItem,
-            refresh: refreshHistory,
-            loadMore,
-            toggleMultiSelectMode,
-            toggleMultiSelectItem,
-            bulkDeleteSelected,
-            bulkFavoriteSelected,
+            select: manager.selectItem,
+            refresh: manager.refreshHistory,
+            loadMore: manager.loadMore,
+            toggleMultiSelectMode: manager.toggleMultiSelectMode,
+            toggleMultiSelectItem: manager.toggleMultiSelectItem,
+            bulkDeleteSelected: manager.bulkDeleteSelected,
+            bulkFavoriteSelected: manager.bulkFavoriteSelected,
           }"
         />
       </template>
 
       <template #main>
         <ClipboardPreview
-          :item="selectedItem"
-          :favorite-pending="favoritePending"
-          :delete-pending="deletePending"
-          :apply-pending="applyPending"
-          :copy-pending="copyPending"
-          :format-timestamp="formatTimestamp"
+          :item="manager.selectedItem.value"
+          :favorite-pending="manager.favoritePending.value"
+          :delete-pending="manager.deletePending.value"
+          :apply-pending="manager.applyPending.value"
+          :copy-pending="manager.copyPending.value"
+          :format-timestamp="manager.formatTimestamp"
           v-on="{
-            toggleFavorite,
-            delete: deleteSelected,
-            copy: () => copyItem(),
-            apply: () => applyItem(),
+            toggleFavorite: manager.toggleFavorite,
+            delete: manager.deleteSelected,
+            copy: () => manager.copyItem(),
+            apply: () => manager.applyItem(),
           }"
         />
       </template>
     </PageHolder>
-    <FullscreenLoadingOverlay v-if="isLoading" />
+    <FullscreenLoadingOverlay v-if="manager?.isLoading.value" />
   </div>
 </template>
 
