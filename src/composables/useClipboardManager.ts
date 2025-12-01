@@ -1,4 +1,5 @@
 import type { PluginClipboardItem } from '@talex-touch/utils/plugin/sdk/types'
+import { onCoreBoxInputChange, useBox } from '@talex-touch/utils'
 import { useClipboardHistory } from '@talex-touch/utils/plugin/sdk'
 import structuredClonePolyfill from '@ungap/structured-clone'
 import { useEventListener } from '@vueuse/core'
@@ -97,7 +98,7 @@ export function useClipboardManager() {
   const clipboard: ClipboardHistoryClient = import.meta.env.SSR
     ? {} as ClipboardHistoryClient
     : (useClipboardHistory() as ClipboardHistoryClient)
-  // const box = useBox()
+  const box = useBox()
 
   const clipboardItems = ref<PluginClipboardItem[]>([])
   const selectedItem = ref<PluginClipboardItem | null>(null)
@@ -407,7 +408,8 @@ export function useClipboardManager() {
       isLoadingMore.value = true
 
     try {
-      const payload = await clipboard.getHistory({ page: targetPage })
+      const input = await box.getInput()
+      const payload = await clipboard.getHistory({ page: targetPage, keyword: input })
       const history = payload.history ?? []
       const previousLength = reset ? 0 : clipboardItems.value.length
       const resolvedPage = typeof payload.page === 'number' ? payload.page : targetPage
@@ -704,6 +706,10 @@ export function useClipboardManager() {
       isLoading.value = false
     }
   }
+
+  onCoreBoxInputChange(async () => {
+    await loadHistory({ reset: true, showInitialSpinner: true })
+  })
 
   onMounted(async () => {
     await bootstrap()

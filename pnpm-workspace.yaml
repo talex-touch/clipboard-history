@@ -35,6 +35,10 @@ catalogs:
     '@talex-touch/utils': ^1.0.36
   conflicts_conflicts_@talex-touch/utils_h1_0_35_h1_0_37:
     '@talex-touch/utils': ^1.0.37
+  conflicts_conflicts_@talex-touch/utils_h1_0_35_h1_0_38:
+    '@talex-touch/utils': ^1.0.38
+  conflicts_conflicts_@talex-touch/utils_h1_0_35_h1_0_39:
+    '@talex-touch/utils': ^1.0.39
   dev:
     '@antfu/eslint-config': ^4.19.0
     '@iconify-json/carbon': ^1.2.14
