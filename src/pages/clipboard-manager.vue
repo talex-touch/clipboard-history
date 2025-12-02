@@ -57,6 +57,10 @@ const manager = useClipboardManager()
           }"
         />
       </template>
+
+      <template #footer>
+        1
+      </template>
     </PageHolder>
     <FullscreenLoadingOverlay v-if="manager?.isLoading.value" />
   </div>

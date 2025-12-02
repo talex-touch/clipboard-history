@@ -3,6 +3,7 @@ packages: []
 catalog:
   '@talex-touch/unplugin-export-plugin': ^1.2.14
   '@talex-touch/utils': ^1.0.34
+  sass-embedded: ^1.93.3
 
 catalogs:
   build:

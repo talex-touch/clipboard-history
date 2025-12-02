@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { PluginClipboardItem } from '@talex-touch/utils/plugin/sdk/types'
+import type { PluginClipboardItem } from '@talex-touch/utils'
 import type { FilterOption } from '~/composables/useClipboardFilters'
 import type { SectionDefinition } from '~/composables/useClipboardSections'
 import { onClickOutside, useEventListener } from '@vueuse/core'

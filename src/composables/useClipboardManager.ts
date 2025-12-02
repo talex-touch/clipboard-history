@@ -662,6 +662,7 @@ export function useClipboardManager() {
     errorMessage.value = null
     try {
       box.clearInput()
+      box.allowInput()
       await loadHistory({ reset: true, showInitialSpinner: true })
       stopClipboardListener = clipboard.onDidChange(handleClipboardChange)
     }
