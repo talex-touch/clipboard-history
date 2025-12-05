@@ -7,10 +7,10 @@ defineOptions({
 <template>
   <div class="ClipboardPageHolder fake-background absolute left-0 top-0 h-full w-full flex flex-col overflow-hidden">
     <div class="ClipboardPageHolder-Main flex overflow-hidden">
-      <aside class="holder-aside w-[40%]" role="complementary">
+      <aside class="holder-aside w-[30%]" role="complementary">
         <slot name="aside" />
       </aside>
-      <section class="holder-main w-[60%]" role="region">
+      <section class="holder-main flex-1" role="region">
         <slot name="main" />
       </section>
     </div>

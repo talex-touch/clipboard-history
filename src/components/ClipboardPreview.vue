@@ -1,9 +1,23 @@
 <script setup lang="ts">
 import type { PluginClipboardItem } from '@talex-touch/utils/plugin/sdk/types'
 import type { ClipboardDerivedType } from '~/composables/useClipboardContentInfo'
-import { computed, ref, watch } from 'vue'
+import { computed } from 'vue'
 import { useClipboardContentInfo } from '~/composables/useClipboardContentInfo'
 import { ensureTFileUrl } from '~/utils/tfile'
+import {
+  PreviewColor,
+  PreviewEmpty,
+  PreviewFiles,
+  PreviewFooter,
+  PreviewImage,
+  PreviewLink,
+  PreviewText,
+} from './clipboard-preview'
+
+/**
+ * ClipboardPreview - Main preview component for clipboard items
+ * @description Displays detailed preview of selected clipboard item with type-specific rendering
+ */
 
 const props = defineProps<{
   item: PluginClipboardItem | null
@@ -69,7 +83,7 @@ function segmentTextContent(value: string): string[] {
   }
 
   return trimmed
-    .split(/[\s,.;，。！？、"'“”‘’()（）[\]{}<>《》]+/)
+    .split(/[\s,.;，。！？、"'()（）[\]{}<>《》]+/)
     .map(token => token.trim())
     .filter(Boolean)
 }
@@ -92,7 +106,6 @@ const contentInfo = useClipboardContentInfo(
 
 const primaryType = computed(() => (props.item?.type ?? '') as string)
 const derivedType = computed(() => props.item ? contentInfo.value.type : 'empty')
-// const currentIcon = computed(() => (props.item ? contentInfo.value.icon : 'i-carbon-clipboard'))
 const typeLabel = computed(() => (props.item ? contentInfo.value.label : '未知类型'))
 const colorSwatch = computed(() => (props.item ? contentInfo.value.colorSwatch : undefined))
 const hrefValue = computed(() => (props.item ? contentInfo.value.href : undefined))
@@ -169,31 +182,25 @@ const textSegmentation = computed<SegmentationGroup[] | null>(() => {
   return groups.length ? groups : null
 })
 
-const allSegmentationTokens = computed(() => textSegmentation.value?.flatMap(group => group.tokens) ?? [])
-const hasTextSegmentation = computed(() => allSegmentationTokens.value.length > 0)
-const selectedTokenKeys = ref<string[]>([])
-const selectedTokens = computed(() => {
-  const keySet = new Set(selectedTokenKeys.value)
-  return allSegmentationTokens.value.filter(token => keySet.has(token.key))
-})
-const hasSelectedTokens = computed(() => selectedTokens.value.length > 0)
-
 const infoRows = computed(() => {
   if (!props.item)
     return []
 
-  const rows: InfoRow[] = [
-    { label: '类型', value: typeLabel.value, icon: 'i-carbon-tag' },
-    { label: '记录时间', value: timestampText.value, icon: 'i-carbon-time' },
-  ]
+  const rows: InfoRow[] = []
 
+  // 1. 来源应用 (Source)
   if (props.item.sourceApp)
     rows.push({ label: '来源应用', value: props.item.sourceApp, icon: 'i-carbon-application' })
-  if (props.item.id !== undefined && props.item.id !== null)
-    rows.push({ label: '标识符', value: String(props.item.id), icon: 'i-carbon-hash' })
 
+  // 2. 内容类型 (Content type)
+  rows.push({ label: '内容类型', value: typeLabel.value, icon: 'i-carbon-tag' })
+
+  // 3. 其他 meta 信息
   if (contentInfo.value.meta.length)
     contentInfo.value.meta.forEach(meta => rows.push({ label: meta.label, value: meta.value, icon: 'i-carbon-information' }))
+
+  // 4. 记录时间
+  rows.push({ label: '记录时间', value: timestampText.value, icon: 'i-carbon-time' })
 
   return rows
 })
@@ -294,586 +301,68 @@ const linkHref = computed(() => {
   return undefined
 })
 
-function isTokenSelected(token: SegmentationToken): boolean {
-  return selectedTokenKeys.value.includes(token.key)
-}
+const isFileType = computed(() =>
+  ['files', 'file'].includes(primaryType.value)
+  || derivedType.value === 'file-uri'
+  || derivedType.value === 'file-path'
+  || derivedType.value === 'folder-path',
+)
 
-function toggleTokenSelection(token: SegmentationToken) {
-  const exists = isTokenSelected(token)
-  if (exists)
-    selectedTokenKeys.value = selectedTokenKeys.value.filter(key => key !== token.key)
-  else
-    selectedTokenKeys.value = [...selectedTokenKeys.value, token.key]
-}
-
-async function copyTokenValues(tokens: SegmentationToken[]) {
-  if (!tokens.length)
-    return
-  const text = tokens.map(token => token.value).join(' ')
-  if (!text)
-    return
-
-  try {
-    if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
-      await navigator.clipboard.writeText(text)
-      return
-    }
-  }
-  catch (error) {
-    console.error('Failed to write tokens to clipboard', error)
-  }
-
-  if (typeof document === 'undefined')
-    return
-
-  const textarea = document.createElement('textarea')
-  textarea.value = text
-  textarea.setAttribute('readonly', '')
-  textarea.style.position = 'absolute'
-  textarea.style.left = '-9999px'
-  document.body.appendChild(textarea)
-  textarea.select()
-
-  try {
-    document.execCommand('copy')
-  }
-  catch (error) {
-    console.error('Fallback copy failed', error)
-  }
-  finally {
-    document.body.removeChild(textarea)
-  }
-}
-
-const tokenCopyPending = ref(false)
-
-async function handleCopyAllTokens() {
-  if (!hasTextSegmentation.value || tokenCopyPending.value)
-    return
-  tokenCopyPending.value = true
-  try {
-    await copyTokenValues(allSegmentationTokens.value)
-  }
-  finally {
-    tokenCopyPending.value = false
-  }
-}
-
-async function handleCopySelectedTokens() {
-  if (!hasSelectedTokens.value || tokenCopyPending.value)
-    return
-  tokenCopyPending.value = true
-  try {
-    await copyTokenValues(selectedTokens.value)
-  }
-  finally {
-    tokenCopyPending.value = false
-  }
-}
-
-watch(textSegmentation, () => {
-  selectedTokenKeys.value = []
-}, { deep: true })
+const isLinkType = computed(() =>
+  derivedType.value === 'url'
+  || derivedType.value === 'email'
+  || derivedType.value === 'email-link'
+  || derivedType.value === 'phone',
+)
 </script>
 
 <template>
-  <div class="clipboard-preview">
-    <div class="preview-surface" :class="{ 'is-empty': !item }">
-      <div v-if="!item" class="preview-empty">
-        <div class="empty-icon" aria-hidden="true">
-          <span class="i-carbon-arrow-up-right" aria-hidden="true" />
-        </div>
-        <p>在左侧选择一个剪贴记录以查看详情</p>
-      </div>
+  <div class="relative box-border h-full flex flex-col gap-4.5 text-[var(--clipboard-text-primary)]">
+    <div
+      class="preview-surface relative flex flex-1 flex-col gap-4.5 overflow-y-auto border border-[var(--clipboard-border-color)] bg-[var(--clipboard-surface-strong)] px-2"
+      :class="{ 'justify-center': !item }"
+    >
+      <PreviewEmpty v-if="!item" />
       <template v-else>
-        <div v-if="derivedType === 'color'" class="preview-block color">
-          <div class="color-sample" :style="{ background: colorSwatch || previewPrimaryText }" aria-hidden="true" />
-          <div class="color-details">
-            <p class="color-value">
-              {{ previewPrimaryText }}
-            </p>
-            <p v-if="previewSecondaryText" class="color-secondary">
-              {{ previewSecondaryText }}
-            </p>
-          </div>
-        </div>
-        <div v-else-if="derivedType === 'data-url-image' || primaryType === 'image'" class="preview-block image">
-          <img :src="imageSrc || item.content" alt="剪贴图片预览">
-        </div>
-        <div v-else-if="['files', 'file'].includes(primaryType) || derivedType === 'file-uri' || derivedType === 'file-path' || derivedType === 'folder-path'" class="preview-block files">
-          <ul>
-            <li v-for="(file, index) in formattedFileList" :key="index">
-              <span class="i-carbon-document" aria-hidden="true" />
-              <a class="file-link" :href="file.href">{{ file.display }}</a>
-            </li>
-          </ul>
-          <pre v-if="!formattedFileList.length && fallbackFileDisplay">{{ fallbackFileDisplay }}</pre>
-        </div>
-        <div v-else-if="derivedType === 'url' || derivedType === 'email' || derivedType === 'email-link' || derivedType === 'phone'" class="preview-block link">
-          <p class="link-primary">
-            <a
-              v-if="linkHref"
-              :href="linkHref"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              {{ previewPrimaryText }}
-            </a>
-            <span v-else>{{ previewPrimaryText }}</span>
-          </p>
-          <p v-if="previewSecondaryText" class="link-secondary">
-            {{ previewSecondaryText }}
-          </p>
-        </div>
-        <div v-else class="preview-block text">
-          <pre>{{ previewText }}</pre>
-          <div v-if="hasTextSegmentation && textSegmentation" class="text-segmentation">
-            <div class="segmentation-actions">
-              <button
-                type="button"
-                class="segmentation-action"
-                :disabled="!hasTextSegmentation || tokenCopyPending"
-                @click="handleCopyAllTokens"
-              >
-                复制全部
-              </button>
-              <button
-                type="button"
-                class="segmentation-action"
-                :disabled="!hasSelectedTokens || tokenCopyPending"
-                @click="handleCopySelectedTokens"
-              >
-                复制选中
-              </button>
-            </div>
-            <div class="segmentation-groups">
-              <section
-                v-for="group in textSegmentation"
-                :key="group.category"
-                class="segmentation-group"
-              >
-                <p class="segmentation-title">
-                  {{ group.label }}
-                </p>
-                <div class="segmentation-chips">
-                  <button
-                    v-for="token in group.tokens"
-                    :key="token.key"
-                    type="button"
-                    class="segmentation-chip"
-                    :class="[
-                      `is-${token.category}`,
-                      { 'is-selected': isTokenSelected(token) },
-                    ]"
-                    :aria-pressed="isTokenSelected(token)"
-                    @click="toggleTokenSelection(token)"
-                  >
-                    {{ token.value }}
-                  </button>
-                </div>
-              </section>
-            </div>
-          </div>
-          <p v-if="previewSecondaryText" class="preview-hint">
-            {{ previewSecondaryText }}
-          </p>
-        </div>
+        <PreviewColor
+          v-if="derivedType === 'color'"
+          :primary-text="previewPrimaryText"
+          :secondary-text="previewSecondaryText"
+          :color-swatch="colorSwatch"
+        />
+        <PreviewImage
+          v-else-if="derivedType === 'data-url-image' || primaryType === 'image'"
+          :src="imageSrc || item.content"
+        />
+        <PreviewFiles
+          v-else-if="isFileType"
+          :files="formattedFileList"
+          :fallback-display="fallbackFileDisplay"
+        />
+        <PreviewLink
+          v-else-if="isLinkType"
+          :primary-text="previewPrimaryText"
+          :secondary-text="previewSecondaryText"
+          :href="linkHref"
+        />
+        <PreviewText
+          v-else
+          :text="previewText"
+          :secondary-text="previewSecondaryText"
+          :segmentation="textSegmentation"
+        />
       </template>
     </div>
 
-    <footer v-if="item" class="preview-footer">
-      <div class="footer-meta">
-        <div v-for="row in infoRows" :key="row.label" class="meta-item">
-          <span :class="row.icon" aria-hidden="true" />
-          <span class="meta-label">{{ row.label }}</span>
-          <span class="meta-value">{{ row.value }}</span>
-        </div>
-        <a
-          v-if="linkHref"
-          class="meta-item meta-link"
-          :href="linkHref"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <span class="i-carbon-launch" aria-hidden="true" />
-          打开链接
-        </a>
-      </div>
-    </footer>
+    <PreviewFooter
+      v-if="item"
+      :rows="infoRows"
+      :link-href="linkHref"
+    />
   </div>
 </template>
 
 <style scoped>
-.clipboard-preview {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-  padding: 22px 20px 18px;
-  gap: 18px;
-  box-sizing: border-box;
-  color: var(--clipboard-text-primary);
-}
-
-.preview-surface {
-  position: relative;
-  flex: 1;
-  border-radius: 12px;
-  background: var(--clipboard-surface-strong);
-  border: 1px solid var(--clipboard-border-color);
-  padding: 18px;
-  overflow-y: auto;
-  display: flex;
-  flex-direction: column;
-  gap: 18px;
-}
-
-.preview-surface.is-empty {
-  justify-content: center;
-}
-.preview-footer {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  border-top: 1px solid var(--clipboard-border-color);
-  padding-top: 12px;
-}
-
-.footer-meta {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px;
-}
-
-.meta-link {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 0.82rem;
-  color: var(--clipboard-color-accent-strong, var(--clipboard-color-accent, #6366f1));
-  text-decoration: none;
-}
-
-.meta-link:hover {
-  text-decoration: underline;
-}
-
-.meta-item {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 12px;
-  border-radius: 999px;
-  background: var(--clipboard-surface-ghost);
-  color: var(--clipboard-text-secondary);
-  font-size: 0.82rem;
-  max-width: 100%;
-}
-
-.meta-item .meta-label {
-  font-size: 0.75rem;
-  color: var(--clipboard-text-muted);
-}
-
-.meta-item .meta-label::after {
-  content: '：';
-  margin: 0 2px;
-  color: inherit;
-}
-
-.meta-item .meta-value {
-  font-weight: 600;
-  color: var(--clipboard-text-primary);
-  word-break: break-word;
-}
-
-.meta-item.meta-link {
-  background: none;
-  padding: 0;
-  border-radius: 0;
-  gap: 4px;
-}
-
-.preview-empty {
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 12px;
-  color: var(--clipboard-text-muted);
-  text-align: center;
-}
-
-.preview-empty .empty-icon {
-  width: 52px;
-  height: 52px;
-  border-radius: 14px;
-  background: var(--clipboard-surface-ghost);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--clipboard-text-muted);
-  font-size: 1.4rem;
-}
-
-.preview-block {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.preview-block.color {
-  flex-direction: row;
-  align-items: center;
-  gap: 20px;
-}
-
-.preview-block.color .color-sample {
-  width: 120px;
-  height: 120px;
-  border-radius: 12px;
-  border: 1px solid var(--clipboard-border-color);
-  box-shadow: none;
-}
-
-.preview-block.color .color-details {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.preview-block.color .color-value {
-  margin: 0;
-  font-size: 1.3rem;
-  font-weight: 600;
-  color: var(--clipboard-text-primary);
-}
-
-.preview-block.color .color-secondary {
-  margin: 0;
-  color: var(--clipboard-text-muted);
-}
-
-.preview-block.text pre {
-  margin: 0;
-  padding: 14px;
-  border-radius: 10px;
-  background: var(--clipboard-surface-ghost);
-  border: 1px solid var(--clipboard-border-color);
-  color: var(--clipboard-text-primary);
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Courier New', monospace;
-  white-space: pre-wrap;
-  word-break: break-word;
-  line-height: 1.5;
-  font-size: 0.92rem;
-}
-
-.preview-block.text .text-segmentation {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  margin-top: 12px;
-  padding: 16px;
-  border-radius: 14px;
-  border: 1px solid color-mix(in srgb, var(--clipboard-border-color) 55%, transparent);
-  background: var(--clipboard-surface-subtle);
-}
-
-.text-segmentation .segmentation-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 10px;
-}
-
-.text-segmentation .segmentation-action {
-  appearance: none;
-  border: none;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 6px 14px;
-  border-radius: 999px;
-  border: 1px solid color-mix(in srgb, var(--clipboard-border-color) 70%, transparent);
-  background: var(--clipboard-surface-ghost);
-  color: var(--clipboard-text-secondary);
-  font-size: 0.8rem;
-  cursor: pointer;
-  transition:
-    background 0.16s ease,
-    border-color 0.16s ease,
-    color 0.16s ease;
-}
-
-.text-segmentation .segmentation-action:hover:not(:disabled) {
-  border-color: var(--clipboard-color-accent, #6366f1);
-  color: var(--clipboard-color-accent-strong, var(--clipboard-color-accent, #6366f1));
-}
-
-.text-segmentation .segmentation-action:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
-}
-
-.text-segmentation .segmentation-groups {
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-}
-
-.text-segmentation .segmentation-group {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.text-segmentation .segmentation-title {
-  margin: 0;
-  font-size: 0.78rem;
-  font-weight: 600;
-  color: var(--clipboard-text-muted);
-}
-
-.text-segmentation .segmentation-chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.text-segmentation .segmentation-chip {
-  appearance: none;
-  border: none;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 4px;
-  padding: 6px 14px;
-  border-radius: 999px;
-  background: var(--clipboard-surface-ghost);
-  border: 1px solid color-mix(in srgb, var(--clipboard-border-color) 70%, transparent);
-  color: var(--clipboard-text-secondary);
-  font-size: 0.82rem;
-  cursor: pointer;
-  transition:
-    background 0.16s ease,
-    border-color 0.16s ease,
-    color 0.16s ease,
-    box-shadow 0.16s ease;
-}
-
-.text-segmentation .segmentation-chip.is-number {
-  min-width: 40px;
-  padding: 6px 12px;
-  font-weight: 600;
-  font-variant-numeric: tabular-nums;
-  border-color: color-mix(in srgb, var(--clipboard-color-success, #22c55e) 65%, transparent);
-  color: color-mix(in srgb, var(--clipboard-color-success, #22c55e) 90%, var(--clipboard-text-secondary));
-}
-
-.text-segmentation .segmentation-chip.is-sms {
-  border-color: color-mix(in srgb, var(--clipboard-color-accent, #6366f1) 65%, transparent);
-  color: var(--clipboard-color-accent-strong, var(--clipboard-color-accent, #6366f1));
-}
-
-.text-segmentation .segmentation-chip.is-word {
-  color: var(--clipboard-text-primary);
-}
-
-.text-segmentation .segmentation-chip.is-selected {
-  border-color: var(--clipboard-color-accent, #6366f1);
-  background: color-mix(in srgb, var(--clipboard-color-accent, #6366f1) 16%, transparent);
-  color: var(--clipboard-color-accent-strong, var(--clipboard-color-accent, #6366f1));
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--clipboard-color-accent, #6366f1) 30%, transparent);
-}
-
-.text-segmentation .segmentation-chip:hover:not(.is-selected) {
-  border-color: color-mix(in srgb, var(--clipboard-color-accent, #6366f1) 45%, transparent);
-  color: var(--clipboard-color-accent-strong, var(--clipboard-color-accent, #6366f1));
-}
-
-.text-segmentation .segmentation-chip:focus-visible {
-  outline: 2px solid var(--clipboard-color-accent, #6366f1);
-  outline-offset: 2px;
-}
-
-.preview-block.image {
-  align-items: center;
-}
-
-.preview-block.image img {
-  max-width: 100%;
-  border-radius: 12px;
-  box-shadow: var(--clipboard-shadow-soft, 0 8px 20px rgba(15, 23, 42, 0.12));
-}
-
-.preview-block.link {
-  gap: 10px;
-}
-
-.preview-block.link .link-primary {
-  margin: 0;
-  font-weight: 600;
-  word-break: break-all;
-}
-
-.preview-block.link a {
-  color: var(--clipboard-color-accent-strong, var(--clipboard-color-accent, #6366f1));
-}
-
-.preview-block.link .link-secondary {
-  margin: 0;
-  color: var(--clipboard-text-muted);
-}
-
-.preview-block.text .preview-hint {
-  margin: 0;
-  color: var(--clipboard-text-muted);
-  font-size: 0.85rem;
-}
-
-.preview-block.files ul {
-  margin: 0;
-  padding: 0;
-  list-style: none;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.preview-block.files li {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 10px 12px;
-  border-radius: 10px;
-  background: var(--clipboard-surface-ghost);
-  border: 1px dashed color-mix(in srgb, var(--clipboard-border-color) 70%, transparent);
-  color: var(--clipboard-text-secondary);
-}
-
-.preview-block.files .file-link {
-  color: var(--clipboard-color-accent-strong, var(--clipboard-color-accent, #6366f1));
-  text-decoration: none;
-  word-break: break-all;
-}
-
-.preview-block.files .file-link:hover {
-  text-decoration: underline;
-}
-
-.preview-block.files pre {
-  margin: 0;
-  padding: 12px;
-  border-radius: 10px;
-  background: var(--clipboard-surface-subtle);
-  border: 1px solid var(--clipboard-border-color);
-  color: var(--clipboard-text-primary);
-  font-size: 0.9rem;
-  white-space: pre-wrap;
-  word-break: break-word;
-}
-
 .preview-surface::-webkit-scrollbar {
   width: 6px;
 }
@@ -886,24 +375,5 @@ watch(textSegmentation, () => {
 
 .preview-surface::-webkit-scrollbar-track {
   background: transparent;
-}
-
-@media (max-width: 1024px) {
-  .clipboard-preview {
-    padding: 18px 16px;
-  }
-}
-
-@media (max-width: 860px) {
-  .preview-header {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 10px;
-  }
-
-  .footer-actions {
-    width: 100%;
-    justify-content: flex-start;
-  }
 }
 </style>
