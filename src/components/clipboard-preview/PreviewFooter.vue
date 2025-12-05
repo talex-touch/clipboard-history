@@ -20,9 +20,9 @@ defineProps<{
 </script>
 
 <template>
-  <footer class="flex flex-col">
+  <footer class="h-[40%] flex flex-col overflow-scroll px-4">
     <!-- Header -->
-    <div class="border-b border-[var(--clipboard-border-color)] py-2">
+    <div class="border-b border-[var(--clipboard-border-color)] pb-2">
       <span class="text-3.5 text-[var(--clipboard-text-muted)]">Information</span>
     </div>
 

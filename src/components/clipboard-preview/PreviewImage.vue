@@ -12,11 +12,11 @@ defineProps<{
 </script>
 
 <template>
-  <div class="flex items-center justify-center">
+  <div class="h-full flex items-center justify-center">
     <img
       :src="src"
       :alt="alt || '剪贴图片预览'"
-      class="max-w-full rounded-3 shadow-[var(--clipboard-shadow-soft,0_8px_20px_rgba(15,23,42,0.12))]"
+      class="max-w-full w-full rounded-3 object-contain"
     >
   </div>
 </template>

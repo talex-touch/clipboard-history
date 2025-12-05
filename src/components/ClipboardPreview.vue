@@ -319,7 +319,7 @@ const isLinkType = computed(() =>
 <template>
   <div class="relative box-border h-full flex flex-col gap-4.5 text-[var(--clipboard-text-primary)]">
     <div
-      class="preview-surface relative flex flex-1 flex-col gap-4.5 overflow-y-auto border border-[var(--clipboard-border-color)] bg-[var(--clipboard-surface-strong)] px-2"
+      class="preview-surface relative h-[60%] flex flex-1 flex-col gap-4.5 overflow-y-auto border border-[var(--clipboard-border-color)] bg-[var(--clipboard-surface-strong)] px-2"
       :class="{ 'justify-center': !item }"
     >
       <PreviewEmpty v-if="!item" />
