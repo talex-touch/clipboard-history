@@ -4,13 +4,13 @@ import { useClipboardHistory } from '@talex-touch/utils/plugin/sdk'
 import structuredClonePolyfill from '@ungap/structured-clone'
 import { useEventListener } from '@vueuse/core'
 import {
-  computed,
   nextTick,
   onBeforeUnmount,
   onMounted,
-  ref,
+  reactive,
   toRaw,
   watch,
+  watchEffect,
 } from 'vue'
 import { toast } from 'vue-sonner'
 import { ensureTFileUrl } from '~/utils/tfile'
@@ -65,53 +65,59 @@ export function useClipboardManager() {
     : (useClipboardHistory() as ClipboardHistoryClient)
   const box = useBox()
 
-  const clipboardItems = ref<PluginClipboardItem[]>([])
-  const selectedItem = ref<PluginClipboardItem | null>(null)
-  const selectedKey = ref<string | null>(null)
-  const isLoading = ref(false)
-  const isLoadingMore = ref(false)
-  const isClearing = ref(false)
-  const favoritePending = ref(false)
-  const deletePending = ref(false)
-  const applyPending = ref(false)
-  const copyPending = ref(false)
-  const bulkDeletePending = ref(false)
-  const bulkFavoritePending = ref(false)
-  const errorMessage = ref<string | null>(null)
+  const state = reactive({
+    clipboardItems: [] as PluginClipboardItem[],
+    selectedItem: null as PluginClipboardItem | null,
+    selectedKey: null as string | null,
+    isLoading: false,
+    isLoadingMore: false,
+    isClearing: false,
+    favoritePending: false,
+    deletePending: false,
+    applyPending: false,
+    copyPending: false,
+    bulkDeletePending: false,
+    bulkFavoritePending: false,
+    errorMessage: null as string | null,
+    page: 1,
+    total: 0,
+    pageSize: 0,
+    hasReachedHistoryEnd: false,
+    multiSelectMode: false,
+    multiSelectedKeys: [] as string[],
+    multiSelectedCount: 0,
+    multiSelectedItems: [] as PluginClipboardItem[],
+    canLoadMore: false,
+    activeIndex: -1,
+  })
 
   if (!import.meta.env.SSR) {
-    watch(errorMessage, (message) => {
+    watch(() => state.errorMessage, (message) => {
       if (!message)
         return
       toast.error(message)
     })
   }
 
-  const page = ref(1)
-  const total = ref(0)
-  const pageSize = ref(0)
-  const hasReachedHistoryEnd = ref(false)
-
-  const multiSelectMode = ref(false)
-  const multiSelectedKeys = ref<string[]>([])
-
   let stopClipboardListener: (() => void) | null = null
   let stopHotkeys: (() => void) | undefined
 
-  const canLoadMore = computed(() => !hasReachedHistoryEnd.value && clipboardItems.value.length < total.value)
-  const multiSelectedKeySet = computed(() => new Set(multiSelectedKeys.value))
-  const multiSelectedCount = computed(() => multiSelectedKeys.value.length)
-  const multiSelectedItems = computed(() => {
-    if (!multiSelectedKeys.value.length)
-      return []
-    const keySet = multiSelectedKeySet.value
-    return clipboardItems.value.filter((item: any) => keySet.has(getItemKey(item)))
+  watchEffect(() => {
+    state.canLoadMore = !state.hasReachedHistoryEnd && state.clipboardItems.length < state.total
   })
 
-  const activeIndex = computed(() => {
-    if (!selectedKey.value)
-      return -1
-    return clipboardItems.value.findIndex((item: any) => getItemKey(item) === selectedKey.value)
+  watchEffect(() => {
+    const keySet = new Set(state.multiSelectedKeys)
+    state.multiSelectedCount = state.multiSelectedKeys.length
+    state.multiSelectedItems = keySet.size
+      ? state.clipboardItems.filter((item: any) => keySet.has(getItemKey(item)))
+      : []
+  })
+
+  watchEffect(() => {
+    state.activeIndex = state.selectedKey
+      ? state.clipboardItems.findIndex((item: any) => getItemKey(item) === state.selectedKey)
+      : -1
   })
 
   function resolvePluginChannel() {
@@ -153,39 +159,39 @@ export function useClipboardManager() {
   }
 
   function clearMultiSelection() {
-    if (multiSelectedKeys.value.length)
-      multiSelectedKeys.value = []
+    if (state.multiSelectedKeys.length)
+      state.multiSelectedKeys = []
   }
 
   function setMultiSelectMode(enabled: boolean) {
-    if (multiSelectMode.value === enabled)
+    if (state.multiSelectMode === enabled)
       return
-    multiSelectMode.value = enabled
+    state.multiSelectMode = enabled
     if (!enabled)
       clearMultiSelection()
   }
 
   function toggleMultiSelectMode() {
-    setMultiSelectMode(!multiSelectMode.value)
+    setMultiSelectMode(!state.multiSelectMode)
   }
 
   function toggleMultiSelectItem(item: PluginClipboardItem) {
     const key = getItemKey(item)
-    const next = new Set(multiSelectedKeys.value)
+    const next = new Set(state.multiSelectedKeys)
     if (next.has(key))
       next.delete(key)
     else
       next.add(key)
-    multiSelectedKeys.value = Array.from(next)
+    state.multiSelectedKeys = Array.from(next)
   }
 
-  watch(clipboardItems, () => {
-    if (!multiSelectedKeys.value.length)
+  watchEffect(() => {
+    if (!state.multiSelectedKeys.length)
       return
-    const existingKeys = new Set(clipboardItems.value.map((entry: any) => getItemKey(entry)))
-    const filtered = multiSelectedKeys.value.filter(key => existingKeys.has(key))
-    if (filtered.length !== multiSelectedKeys.value.length)
-      multiSelectedKeys.value = filtered
+    const existingKeys = new Set(state.clipboardItems.map((entry: any) => getItemKey(entry)))
+    const filtered = state.multiSelectedKeys.filter(key => existingKeys.has(key))
+    if (filtered.length !== state.multiSelectedKeys.length)
+      state.multiSelectedKeys = filtered
   })
 
   function parseFileListFromItem(item: PluginClipboardItem): string[] {
@@ -250,52 +256,52 @@ export function useClipboardManager() {
 
   function setSelection(item: PluginClipboardItem) {
     const key = getItemKey(item)
-    selectedItem.value = item
-    selectedKey.value = key
+    state.selectedItem = item
+    state.selectedKey = key
     nextTick(() => ensureItemVisible(key))
   }
 
   function ensureSelection(preferredKey?: string) {
-    if (!clipboardItems.value.length) {
-      selectedItem.value = null
-      selectedKey.value = null
+    if (!state.clipboardItems.length) {
+      state.selectedItem = null
+      state.selectedKey = null
       return
     }
 
-    const targetKey = preferredKey ?? selectedKey.value
+    const targetKey = preferredKey ?? state.selectedKey
     if (!targetKey) {
-      setSelection(clipboardItems.value[0])
+      setSelection(state.clipboardItems[0])
       return
     }
 
-    const match = clipboardItems.value.find((item: any) => getItemKey(item) === targetKey)
+    const match = state.clipboardItems.find((item: any) => getItemKey(item) === targetKey)
     if (match)
       setSelection(match)
     else
-      setSelection(clipboardItems.value[0])
+      setSelection(state.clipboardItems[0])
   }
 
   function selectByIndex(index: number) {
-    if (!clipboardItems.value.length)
+    if (!state.clipboardItems.length)
       return
 
-    const normalizedIndex = (index + clipboardItems.value.length) % clipboardItems.value.length
-    const nextItem = clipboardItems.value[normalizedIndex]
+    const normalizedIndex = (index + state.clipboardItems.length) % state.clipboardItems.length
+    const nextItem = state.clipboardItems[normalizedIndex]
     if (nextItem)
       setSelection(nextItem)
   }
 
   function handleArrowNavigation(event: KeyboardEvent) {
-    if (!clipboardItems.value.length)
+    if (!state.clipboardItems.length)
       return
 
     if (event.key === 'ArrowDown') {
       event.preventDefault()
-      selectByIndex((activeIndex.value === -1 ? 0 : activeIndex.value) + 1)
+      selectByIndex((state.activeIndex === -1 ? 0 : state.activeIndex) + 1)
     }
     else if (event.key === 'ArrowUp') {
       event.preventDefault()
-      selectByIndex((activeIndex.value === -1 ? clipboardItems.value.length - 1 : activeIndex.value) - 1)
+      selectByIndex((state.activeIndex === -1 ? state.clipboardItems.length - 1 : state.activeIndex) - 1)
     }
     else if (event.key === 'Home') {
       event.preventDefault()
@@ -303,12 +309,12 @@ export function useClipboardManager() {
     }
     else if (event.key === 'End') {
       event.preventDefault()
-      selectByIndex(clipboardItems.value.length - 1)
+      selectByIndex(state.clipboardItems.length - 1)
     }
   }
 
   function handleQuickSelect(event: KeyboardEvent) {
-    if (!clipboardItems.value.length)
+    if (!state.clipboardItems.length)
       return
 
     if (!(event.metaKey || event.ctrlKey) || event.shiftKey)
@@ -319,7 +325,7 @@ export function useClipboardManager() {
       return
 
     const index = key - 1
-    if (index < clipboardItems.value.length)
+    if (index < state.clipboardItems.length)
       selectByIndex(index)
   }
 
@@ -327,6 +333,12 @@ export function useClipboardManager() {
     const target = event.target as HTMLElement | null
     if (target?.tagName === 'INPUT' || target?.tagName === 'TEXTAREA' || target?.isContentEditable)
       return
+
+    if ((event.metaKey || event.ctrlKey) && !event.shiftKey && !event.altKey && (event.key === 's' || event.key === 'S')) {
+      event.preventDefault()
+      await toggleFavorite()
+      return
+    }
 
     if (event.key === 'Enter') {
       event.preventDefault()
@@ -355,44 +367,44 @@ export function useClipboardManager() {
     } = options
 
     if (showInitialSpinner || reset)
-      errorMessage.value = null
+      state.errorMessage = null
 
     if (reset) {
-      page.value = 1
-      hasReachedHistoryEnd.value = false
+      state.page = 1
+      state.hasReachedHistoryEnd = false
     }
 
-    const targetPage = reset ? 1 : page.value + 1
+    const targetPage = reset ? 1 : state.page + 1
 
-    if (!reset && !canLoadMore.value)
+    if (!reset && !state.canLoadMore)
       return
 
     if (showInitialSpinner)
-      isLoading.value = true
+      state.isLoading = true
     else if (!reset)
-      isLoadingMore.value = true
+      state.isLoadingMore = true
 
     try {
       const input = await box.getInput()
       const payload = await clipboard.getHistory({ page: targetPage, keyword: input })
       const history = payload.history ?? []
-      const previousLength = reset ? 0 : clipboardItems.value.length
+      const previousLength = reset ? 0 : state.clipboardItems.length
       const resolvedPage = typeof payload.page === 'number' ? payload.page : targetPage
-      const resolvedPageSize = typeof payload.pageSize === 'number' ? payload.pageSize : pageSize.value
+      const resolvedPageSize = typeof payload.pageSize === 'number' ? payload.pageSize : state.pageSize
 
-      page.value = resolvedPage
-      total.value = payload.total
-      pageSize.value = resolvedPageSize
+      state.page = resolvedPage
+      state.total = payload.total
+      state.pageSize = resolvedPageSize
 
-      clipboardItems.value = reset ? history : mergeHistory(clipboardItems.value, history)
-      const nextLength = clipboardItems.value.length
+      state.clipboardItems = reset ? history : mergeHistory(state.clipboardItems, history)
+      const nextLength = state.clipboardItems.length
 
       if (reset) {
         const hasMore
           = resolvedPageSize > 0
             ? history.length >= resolvedPageSize
             : history.length > 0
-        hasReachedHistoryEnd.value = !hasMore
+        state.hasReachedHistoryEnd = !hasMore
       }
       else {
         const reachedEnd
@@ -401,20 +413,20 @@ export function useClipboardManager() {
             || (resolvedPageSize > 0 && history.length < resolvedPageSize)
             || nextLength === previousLength
 
-        hasReachedHistoryEnd.value = !!reachedEnd
+        state.hasReachedHistoryEnd = !!reachedEnd
       }
 
       if (ensureSelectionVisible)
         ensureSelection()
     }
     catch (error) {
-      errorMessage.value = formatError(error)
+      state.errorMessage = formatError(error)
     }
     finally {
       if (showInitialSpinner)
-        isLoading.value = false
+        state.isLoading = false
       if (!showInitialSpinner && !reset)
-        isLoadingMore.value = false
+        state.isLoadingMore = false
     }
   }
 
@@ -426,12 +438,12 @@ export function useClipboardManager() {
     await loadHistory({ reset: false, ensureSelectionVisible: false })
   }
 
-  async function applyItem(item: PluginClipboardItem | null = selectedItem.value): Promise<boolean> {
-    if (!item || applyPending.value)
+  async function applyItem(item: PluginClipboardItem | null = state.selectedItem): Promise<boolean> {
+    if (!item || state.applyPending)
       return false
 
-    applyPending.value = true
-    errorMessage.value = null
+    state.applyPending = true
+    state.errorMessage = null
 
     try {
       const payload = cloneClipboardItem(item)
@@ -464,20 +476,20 @@ export function useClipboardManager() {
         item,
         error,
       })
-      errorMessage.value = formatError(error)
+      state.errorMessage = formatError(error)
       return false
     }
     finally {
-      applyPending.value = false
+      state.applyPending = false
     }
   }
 
-  async function copyItem(item: PluginClipboardItem | null = selectedItem.value): Promise<boolean> {
-    if (!item || copyPending.value)
+  async function copyItem(item: PluginClipboardItem | null = state.selectedItem): Promise<boolean> {
+    if (!item || state.copyPending)
       return false
 
-    copyPending.value = true
-    errorMessage.value = null
+    state.copyPending = true
+    state.errorMessage = null
 
     try {
       const payload = cloneClipboardItem(item)
@@ -489,86 +501,86 @@ export function useClipboardManager() {
         item,
         error,
       })
-      errorMessage.value = formatError(error)
+      state.errorMessage = formatError(error)
       return false
     }
     finally {
-      copyPending.value = false
+      state.copyPending = false
     }
   }
 
   async function toggleFavorite() {
-    if (!selectedItem.value?.id || favoritePending.value)
+    if (!state.selectedItem?.id || state.favoritePending)
       return
 
-    favoritePending.value = true
-    errorMessage.value = null
-    const nextState = !selectedItem.value.isFavorite
+    state.favoritePending = true
+    state.errorMessage = null
+    const nextState = !state.selectedItem.isFavorite
 
     try {
       await clipboard.setFavorite({
-        id: Number(selectedItem.value.id),
+        id: Number(state.selectedItem.id),
         isFavorite: nextState,
       })
 
-      const key = getItemKey(selectedItem.value)
-      const index = clipboardItems.value.findIndex((item: any) => getItemKey(item) === key)
+      const key = getItemKey(state.selectedItem)
+      const index = state.clipboardItems.findIndex((item: any) => getItemKey(item) === key)
       if (index !== -1) {
-        clipboardItems.value.splice(index, 1, {
-          ...clipboardItems.value[index],
+        state.clipboardItems.splice(index, 1, {
+          ...state.clipboardItems[index],
           isFavorite: nextState,
         })
-        selectedItem.value = { ...selectedItem.value, isFavorite: nextState }
+        state.selectedItem = { ...state.selectedItem, isFavorite: nextState }
       }
     }
     catch (error) {
-      errorMessage.value = formatError(error)
+      state.errorMessage = formatError(error)
     }
     finally {
-      favoritePending.value = false
+      state.favoritePending = false
     }
   }
 
   async function deleteSelected() {
-    if (!selectedItem.value?.id || deletePending.value)
+    if (!state.selectedItem?.id || state.deletePending)
       return
 
-    deletePending.value = true
-    errorMessage.value = null
-    const key = getItemKey(selectedItem.value)
+    state.deletePending = true
+    state.errorMessage = null
+    const key = getItemKey(state.selectedItem)
 
     try {
-      await clipboard.deleteItem({ id: Number(selectedItem.value.id) })
+      await clipboard.deleteItem({ id: Number(state.selectedItem.id) })
 
-      clipboardItems.value = clipboardItems.value.filter((item: any) => getItemKey(item) !== key)
-      total.value = Math.max(0, total.value - 1)
+      state.clipboardItems = state.clipboardItems.filter((item: any) => getItemKey(item) !== key)
+      state.total = Math.max(0, state.total - 1)
       ensureSelection()
     }
     catch (error) {
-      errorMessage.value = formatError(error)
+      state.errorMessage = formatError(error)
     }
     finally {
-      deletePending.value = false
+      state.deletePending = false
     }
   }
 
   async function clearHistory() {
-    if (isClearing.value)
+    if (state.isClearing)
       return
 
-    isClearing.value = true
-    errorMessage.value = null
+    state.isClearing = true
+    state.errorMessage = null
     try {
       await clipboard.clearHistory()
-      clipboardItems.value = []
-      total.value = 0
+      state.clipboardItems = []
+      state.total = 0
       ensureSelection()
     }
     catch (error) {
-      errorMessage.value = formatError(error)
+      state.errorMessage = formatError(error)
     }
     finally {
-      isClearing.value = false
+      state.isClearing = false
     }
   }
 
@@ -577,53 +589,53 @@ export function useClipboardManager() {
   }
 
   async function bulkDeleteSelected() {
-    if (!multiSelectedKeys.value.length || bulkDeletePending.value)
+    if (!state.multiSelectedKeys.length || state.bulkDeletePending)
       return
 
-    bulkDeletePending.value = true
-    errorMessage.value = null
+    state.bulkDeletePending = true
+    state.errorMessage = null
 
-    const targetKeys = new Set(multiSelectedKeys.value)
-    const itemsToDelete = clipboardItems.value.filter((item: any) => targetKeys.has(getItemKey(item)) && item.id != null)
+    const targetKeys = new Set(state.multiSelectedKeys)
+    const itemsToDelete = state.clipboardItems.filter((item: any) => targetKeys.has(getItemKey(item)) && item.id != null)
 
     try {
       for (const item of itemsToDelete)
         await clipboard.deleteItem({ id: Number(item.id) })
 
-      clipboardItems.value = clipboardItems.value.filter((item: any) => !targetKeys.has(getItemKey(item)))
+      state.clipboardItems = state.clipboardItems.filter((item: any) => !targetKeys.has(getItemKey(item)))
       const deletedCount = itemsToDelete.length
       if (deletedCount)
-        total.value = Math.max(0, total.value - deletedCount)
+        state.total = Math.max(0, state.total - deletedCount)
 
-      multiSelectedKeys.value = []
-      if (selectedKey.value && targetKeys.has(selectedKey.value))
+      state.multiSelectedKeys = []
+      if (state.selectedKey && targetKeys.has(state.selectedKey))
         ensureSelection()
       else
-        ensureSelection(selectedKey.value ?? undefined)
+        ensureSelection(state.selectedKey ?? undefined)
     }
     catch (error) {
-      errorMessage.value = formatError(error)
+      state.errorMessage = formatError(error)
     }
     finally {
-      bulkDeletePending.value = false
+      state.bulkDeletePending = false
     }
   }
 
   async function bulkFavoriteSelected() {
-    if (!multiSelectedKeys.value.length || bulkFavoritePending.value)
+    if (!state.multiSelectedKeys.length || state.bulkFavoritePending)
       return
 
-    bulkFavoritePending.value = true
-    errorMessage.value = null
+    state.bulkFavoritePending = true
+    state.errorMessage = null
 
-    const targetKeys = new Set(multiSelectedKeys.value)
-    const itemsToFavorite = clipboardItems.value.filter((item: any) => targetKeys.has(getItemKey(item)) && item.id != null)
+    const targetKeys = new Set(state.multiSelectedKeys)
+    const itemsToFavorite = state.clipboardItems.filter((item: any) => targetKeys.has(getItemKey(item)) && item.id != null)
 
     try {
       for (const item of itemsToFavorite)
         await clipboard.setFavorite({ id: Number(item.id), isFavorite: true })
 
-      clipboardItems.value = clipboardItems.value.map((item: any) => {
+      state.clipboardItems = state.clipboardItems.map((item: any) => {
         if (!targetKeys.has(getItemKey(item)))
           return item
         return {
@@ -632,34 +644,34 @@ export function useClipboardManager() {
         }
       })
 
-      if (selectedItem.value && targetKeys.has(getItemKey(selectedItem.value)))
-        selectedItem.value = { ...selectedItem.value, isFavorite: true }
+      if (state.selectedItem && targetKeys.has(getItemKey(state.selectedItem)))
+        state.selectedItem = { ...state.selectedItem, isFavorite: true }
     }
     catch (error) {
-      errorMessage.value = formatError(error)
+      state.errorMessage = formatError(error)
     }
     finally {
-      bulkFavoritePending.value = false
+      state.bulkFavoritePending = false
     }
   }
 
   function handleClipboardChange(item: PluginClipboardItem) {
     const key = getItemKey(item)
-    const index = clipboardItems.value.findIndex((existing: any) => getItemKey(existing) === key)
+    const index = state.clipboardItems.findIndex((existing: any) => getItemKey(existing) === key)
     if (index === -1) {
-      clipboardItems.value.unshift(item)
-      total.value += 1
+      state.clipboardItems.unshift(item)
+      state.total += 1
     }
     else {
-      clipboardItems.value.splice(index, 1, { ...clipboardItems.value[index], ...item })
+      state.clipboardItems.splice(index, 1, { ...state.clipboardItems[index], ...item })
     }
 
-    hasReachedHistoryEnd.value = false
+    state.hasReachedHistoryEnd = false
     ensureSelection(key)
   }
 
   async function bootstrap() {
-    errorMessage.value = null
+    state.errorMessage = null
     try {
       box.clearInput()
       box.allowInput()
@@ -667,10 +679,10 @@ export function useClipboardManager() {
       stopClipboardListener = clipboard.onDidChange(handleClipboardChange)
     }
     catch (error) {
-      errorMessage.value = formatError(error)
+      state.errorMessage = formatError(error)
     }
     finally {
-      isLoading.value = false
+      state.isLoading = false
     }
   }
 
@@ -689,32 +701,7 @@ export function useClipboardManager() {
     stopHotkeys?.()
   })
 
-  return {
-    // state
-    clipboardItems,
-    selectedItem,
-    selectedKey,
-    isLoading,
-    isLoadingMore,
-    isClearing,
-    favoritePending,
-    deletePending,
-    applyPending,
-    copyPending,
-    bulkDeletePending,
-    bulkFavoritePending,
-    errorMessage,
-    page,
-    total,
-    pageSize,
-    canLoadMore,
-    multiSelectMode,
-    multiSelectedKeys,
-    multiSelectedCount,
-    multiSelectedItems,
-    // getters
-    activeIndex,
-    // actions
+  return Object.assign(state, {
     selectItem,
     selectByIndex,
     refreshHistory,
@@ -731,5 +718,5 @@ export function useClipboardManager() {
     copyItem,
     loadHistory,
     formatTimestamp,
-  }
+  })
 }

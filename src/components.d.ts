@@ -8,6 +8,7 @@ export {}
 /* prettier-ignore */
 declare module 'vue' {
   export interface GlobalComponents {
+    ClipboardActionBar: typeof import('./components/ClipboardActionBar.vue')['default']
     ClipboardEmptyState: typeof import('./components/clipboard-list/ClipboardEmptyState.vue')['default']
     ClipboardItemCard: typeof import('./components/clipboard-list/ClipboardItemCard.vue')['default']
     ClipboardList: typeof import('./components/ClipboardList.vue')['default']

@@ -1,26 +1,13 @@
 <script setup lang="ts">
 import type { PluginClipboardItem } from '@talex-touch/utils/plugin/sdk/types'
 import type { ClipboardDerivedType } from '~/composables/useClipboardContentInfo'
-import { getActiveAppSnapshot } from '@talex-touch/utils/plugin/sdk'
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useClipboardContentInfo } from '~/composables/useClipboardContentInfo'
 import { ensureTFileUrl } from '~/utils/tfile'
 
 const props = defineProps<{
   item: PluginClipboardItem | null
-  favoritePending: boolean
-  deletePending: boolean
-  applyPending: boolean
-  copyPending: boolean
   formatTimestamp: (timestamp: PluginClipboardItem['timestamp']) => string
-}>()
-
-const emit = defineEmits<{
-  (event: 'toggleFavorite'): void
-  (event: 'delete'): void
-  (event: 'copy'): void
-  (event: 'apply'): void
-  (event: 'flow'): void
 }>()
 
 interface InfoRow {
@@ -191,17 +178,6 @@ const selectedTokens = computed(() => {
 })
 const hasSelectedTokens = computed(() => selectedTokens.value.length > 0)
 
-const activeAppName = ref('当前应用')
-const pasteTargetName = computed(() => activeAppName.value?.trim() || '当前应用')
-const pasteButtonLabel = computed(() => props.applyPending ? `粘贴到${pasteTargetName.value}中…` : `粘贴到${pasteTargetName.value}`)
-const copyButtonLabel = computed(() => (props.copyPending ? '复制中…' : '复制'))
-const favoriteButtonLabel = computed(() => {
-  if (props.favoritePending)
-    return '更新收藏状态…'
-  return props.item?.isFavorite ? '取消收藏' : '设为收藏'
-})
-const deleteButtonLabel = computed(() => (props.deletePending ? '删除中…' : '删除'))
-
 const infoRows = computed(() => {
   if (!props.item)
     return []
@@ -318,26 +294,6 @@ const linkHref = computed(() => {
   return undefined
 })
 
-function handleToggleFavorite() {
-  emit('toggleFavorite')
-}
-
-function handleDelete() {
-  emit('delete')
-}
-
-function handleCopy() {
-  emit('copy')
-}
-
-function handleApply() {
-  emit('apply')
-}
-
-function handleFlow() {
-  emit('flow')
-}
-
 function isTokenSelected(token: SegmentationToken): boolean {
   return selectedTokenKeys.value.includes(token.key)
 }
@@ -418,19 +374,6 @@ async function handleCopySelectedTokens() {
 watch(textSegmentation, () => {
   selectedTokenKeys.value = []
 }, { deep: true })
-
-onMounted(async () => {
-  try {
-    const snapshot = await getActiveAppSnapshot().catch(() => null)
-    const candidates = [snapshot?.displayName, snapshot?.windowTitle, snapshot?.identifier]
-    const resolved = candidates.find(name => typeof name === 'string' && name.trim().length)
-    if (resolved)
-      activeAppName.value = resolved.trim()
-  }
-  catch {
-    // ignore channel errors when SDK is unavailable
-  }
-})
 </script>
 
 <template>
@@ -556,61 +499,6 @@ onMounted(async () => {
           打开链接
         </a>
       </div>
-      <div class="footer-actions">
-        <button
-          class="surface-button"
-          type="button"
-          :disabled="copyPending || !item"
-          :title="copyButtonLabel"
-          :aria-label="copyButtonLabel"
-          @click="handleCopy"
-        >
-          <span class="button-icon" :class="copyPending ? 'i-carbon-time' : 'i-carbon-copy'" aria-hidden="true" />
-          <span class="button-text">{{ copyButtonLabel }}</span>
-        </button>
-        <button
-          class="surface-button primary"
-          type="button"
-          :disabled="applyPending || !item"
-          :title="pasteButtonLabel"
-          :aria-label="pasteButtonLabel"
-          @click="handleApply"
-        >
-          <span class="button-icon" :class="applyPending ? 'i-carbon-time' : 'i-carbon-paste'" aria-hidden="true" />
-          <span class="button-text">{{ pasteButtonLabel }}</span>
-        </button>
-        <button
-          class="surface-button"
-          type="button"
-          :disabled="!item"
-          title="流转"
-          aria-label="流转"
-          @click="handleFlow"
-        >
-          <span class="button-icon i-carbon-repeat" aria-hidden="true" />
-          <span class="button-text">流转</span>
-        </button>
-        <button
-          class="surface-button icon-only" :class="[{ 'is-active': item?.isFavorite }]"
-          type="button"
-          :disabled="favoritePending || !item?.id"
-          :title="favoriteButtonLabel"
-          :aria-label="favoriteButtonLabel"
-          @click="handleToggleFavorite"
-        >
-          <span class="button-icon" :class="item?.isFavorite ? 'i-carbon-star-filled' : 'i-carbon-star'" aria-hidden="true" />
-        </button>
-        <button
-          class="surface-button danger icon-only"
-          type="button"
-          :disabled="deletePending || !item?.id"
-          :title="deleteButtonLabel"
-          :aria-label="deleteButtonLabel"
-          @click="handleDelete"
-        >
-          <span class="button-icon" :class="deletePending ? 'i-carbon-time' : 'i-carbon-delete'" aria-hidden="true" />
-        </button>
-      </div>
     </footer>
   </div>
 </template>
@@ -705,92 +593,6 @@ onMounted(async () => {
   padding: 0;
   border-radius: 0;
   gap: 4px;
-}
-
-.footer-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.surface-button {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  min-height: 40px;
-  padding: 0 14px;
-  border-radius: 999px;
-  border: 1px solid var(--clipboard-border-color);
-  background: transparent;
-  color: var(--clipboard-text-secondary);
-  cursor: pointer;
-  font-size: 0.88rem;
-  transition:
-    background 0.18s ease,
-    border-color 0.18s ease,
-    color 0.18s ease;
-}
-
-.surface-button .button-icon {
-  font-size: 1.05rem;
-}
-
-.surface-button .button-text {
-  font-size: 0.82rem;
-  font-weight: 500;
-}
-
-.surface-button.icon-only {
-  width: 40px;
-  min-height: 40px;
-  padding: 0;
-  border-radius: 50%;
-  gap: 0;
-}
-
-.surface-button.icon-only .button-text {
-  display: none;
-}
-
-.surface-button.primary {
-  border-color: var(--clipboard-color-accent, #6366f1);
-  color: var(--clipboard-color-accent-strong, var(--clipboard-color-accent, #6366f1));
-}
-
-.surface-button:hover:not(:disabled) {
-  background: color-mix(in srgb, currentColor 14%, transparent);
-  border-color: color-mix(in srgb, currentColor 40%, var(--clipboard-border-color));
-}
-
-.surface-button.danger {
-  border-color: color-mix(in srgb, var(--clipboard-color-danger, #ef4444) 36%, transparent);
-  color: var(--clipboard-color-danger, #ef4444);
-}
-
-.surface-button.danger:hover:not(:disabled) {
-  background: color-mix(in srgb, var(--clipboard-color-danger, #ef4444) 12%, transparent);
-  border-color: var(--clipboard-color-danger, #ef4444);
-  color: var(--clipboard-color-danger, #ef4444);
-}
-
-.surface-button.primary:hover:not(:disabled) {
-  border-color: var(--clipboard-color-accent, #6366f1);
-  color: var(--clipboard-color-accent-strong, var(--clipboard-color-accent, #6366f1));
-}
-
-.surface-button:disabled {
-  opacity: 0.55;
-  cursor: not-allowed;
-}
-
-.surface-button.is-active {
-  border-color: var(--clipboard-color-accent, #6366f1);
-  color: var(--clipboard-color-accent-strong, var(--clipboard-color-accent, #6366f1));
-}
-
-.surface-button.is-active:hover:not(:disabled) {
-  border-color: var(--clipboard-color-accent, #6366f1);
 }
 
 .preview-empty {

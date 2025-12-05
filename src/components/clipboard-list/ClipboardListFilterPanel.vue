@@ -1,9 +1,12 @@
 <script setup lang="ts">
+import type { CSSProperties } from 'vue'
+
 import type { FilterMenuItem } from '~/composables/useClipboardFilters'
 
 defineProps<{
   items: FilterMenuItem[]
   selected: string
+  panelStyle?: CSSProperties
 }>()
 
 const emit = defineEmits<{
@@ -17,7 +20,7 @@ function handleSelect(item: FilterMenuItem) {
 
 <template>
   <transition name="fade">
-    <div v-if="items.length" class="filter-panel" role="menu">
+    <div v-if="items.length" class="filter-panel" role="menu" :style="panelStyle">
       <button
         v-for="option in items"
         :key="option.value"
@@ -49,19 +52,18 @@ function handleSelect(item: FilterMenuItem) {
 }
 
 .filter-panel {
-  position: absolute;
-  top: calc(100% + 8px);
-  right: 0;
+  position: fixed;
   display: flex;
   flex-direction: column;
   gap: 6px;
-  min-width: 188px;
+  min-width: 220px;
+  max-width: 320px;
   padding: 12px;
   border-radius: 14px;
   border: 1px solid var(--clipboard-border-color);
   background: var(--clipboard-surface-elevated);
   box-shadow: var(--clipboard-shadow-strong);
-  z-index: 20;
+  z-index: 2000;
 }
 
 .filter-option {

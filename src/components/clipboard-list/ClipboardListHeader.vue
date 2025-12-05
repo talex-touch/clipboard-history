@@ -42,7 +42,7 @@ const multiSelectLabel = computed(() => {
 </script>
 
 <template>
-  <header class="header-root mt-2 flex items-center justify-between gap-2 text-sm">
+  <header class="header-root flex items-center gap-2 text-sm">
     <div class="header-title">
       <p>
         {{ summaryText }}
@@ -84,12 +84,14 @@ const multiSelectLabel = computed(() => {
 <style scoped>
 .header-root {
   color: var(--clipboard-text-secondary);
+  flex: 0 0 auto;
 }
 
 .header-title p {
   margin: 0;
   color: var(--clipboard-text-secondary);
   font-weight: 600;
+  white-space: nowrap;
 }
 
 .filter-toggle,
@@ -97,6 +99,7 @@ const multiSelectLabel = computed(() => {
   border: 1px solid var(--clipboard-border-color);
   background: var(--clipboard-surface-subtle);
   color: var(--clipboard-text-secondary);
+  white-space: nowrap;
 }
 
 .filter-toggle:hover,

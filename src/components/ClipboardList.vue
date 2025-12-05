@@ -3,7 +3,7 @@ import type { PluginClipboardItem } from '@talex-touch/utils'
 import type { FilterOption } from '~/composables/useClipboardFilters'
 import type { SectionDefinition } from '~/composables/useClipboardSections'
 import { onClickOutside, useEventListener } from '@vueuse/core'
-import { computed, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import ClipboardEmptyState from '~/components/clipboard-list/ClipboardEmptyState.vue'
 import ClipboardItemCard from '~/components/clipboard-list/ClipboardItemCard.vue'
 import ClipboardListFilterPanel from '~/components/clipboard-list/ClipboardListFilterPanel.vue'
@@ -61,11 +61,15 @@ const sectionDefinitions: SectionDefinition[] = [
   { key: 'forever', title: '永久' },
 ]
 
-const scrollAreaRef = ref<HTMLElement | null>(null)
-const filterControlsRef = ref<HTMLElement | null>(null)
+const scrollAreaRef = ref<HTMLElement>()
+const filterControlsRef = ref<HTMLElement>()
+const filterPanelRef = ref<HTMLElement>()
+const filterPanelStyle = ref<Record<string, string>>({})
 const shouldDisableLoadMore = ref(false)
 const pendingFilteredLoad = ref(false)
 const baselineFilteredCount = ref(0)
+const footerPortalReady = ref(false)
+const footerPortalSelector = '#clipboard-footer-left'
 
 const filterState = useClipboardFilters({
   items: () => props.items,
@@ -95,17 +99,75 @@ const activeFilterLabel = computed(() => {
 const hasItems = computed(() => filterState.filteredItems.value.length > 0)
 const multiSelectedSet = computed(() => new Set(props.multiSelectedKeys))
 
-onClickOutside(filterControlsRef, () => {
-  if (filterState.isPanelOpen.value)
-    filterState.closePanel()
-})
+function updateFilterPanelPosition() {
+  if (!filterState.isPanelOpen.value || typeof window === 'undefined')
+    return
+
+  const margin = 12
+  const fallbackWidth = 260
+  const viewportWidth = window.innerWidth
+  // const viewportHeight = window.innerHeight
+  const trigger = filterControlsRef.value
+
+  if (!trigger) {
+    filterPanelStyle.value = {
+      position: 'fixed',
+      top: `${margin}px`,
+      left: `${margin}px`,
+      width: `${fallbackWidth}px`,
+      maxHeight: `calc(100vh - ${margin * 2}px)`,
+    }
+    return
+  }
+
+  const rect = trigger.getBoundingClientRect()
+  const width = Math.min(fallbackWidth, viewportWidth - margin * 2)
+  const left = Math.min(
+    Math.max(rect.left, margin),
+    viewportWidth - margin - width,
+  )
+  const panelHeight = filterPanelRef.value?.offsetHeight ?? fallbackWidth
+  const top = rect.top - margin - panelHeight
+  const clampedTop = Math.max(margin, top - 48)
+
+  filterPanelStyle.value = {
+    position: 'fixed',
+    top: `${clampedTop}px`,
+    left: `${left}px`,
+    width: `${width}px`,
+    maxHeight: `calc(100vh - ${margin * 2}px)`,
+  }
+}
 
 if (typeof document !== 'undefined') {
   useEventListener(document, 'keydown', (event: KeyboardEvent) => {
     if (event.key === 'Escape' && filterState.isPanelOpen.value)
       filterState.closePanel()
   })
+
+  useEventListener(document.defaultView ?? window, 'resize', () => {
+    if (filterState.isPanelOpen.value)
+      updateFilterPanelPosition()
+  })
 }
+
+watch(() => filterState.isPanelOpen.value, async (open) => {
+  if (open) {
+    await nextTick()
+    updateFilterPanelPosition()
+  }
+})
+
+onClickOutside(filterPanelRef, () => {
+  if (filterState.isPanelOpen.value)
+    filterState.closePanel()
+}, { ignore: [filterControlsRef] })
+
+onMounted(() => {
+  if (typeof document === 'undefined')
+    return
+  footerPortalReady.value = !!document.querySelector(footerPortalSelector)
+})
 
 function handleSelect(item: PluginClipboardItem) {
   emit('select', item)
@@ -192,7 +254,81 @@ const canDisplayLoadMore = computed(() => props.canLoadMore && !shouldDisableLoa
     :aria-multiselectable="multiSelectMode || undefined"
   >
     <div ref="scrollAreaRef" class="h-full overflow-y-auto" tabindex="-1">
-      <div ref="filterControlsRef" class="relative px-2 pb-3">
+      <template v-if="hasItems">
+        <ClipboardSection
+          v-for="section in groupedSections"
+          :key="section.key"
+          :title="section.title"
+          :count="section.items.length"
+        >
+          <ClipboardItemCard
+            v-for="entry in section.items"
+            :key="getItemKey(entry.item)"
+            :item="entry.item"
+            :index="entry.globalIndex"
+            :is-active="selectedKey === getItemKey(entry.item)"
+            :is-multi-select-mode="multiSelectMode"
+            :is-multi-selected="isItemInMultiSelection(entry.item)"
+            @select="handleSelect"
+            @toggle-multi-select="handleToggleMultiSelectItem"
+          />
+        </ClipboardSection>
+      </template>
+      <ClipboardEmptyState v-else :is-loading="isLoading" />
+
+      <ClipboardLoadMore
+        :can-load-more="canDisplayLoadMore"
+        :is-loading="isLoading"
+        :is-loading-more="isLoadingMore"
+        @load-more="handleLoadMore"
+      />
+    </div>
+
+    <Teleport v-if="footerPortalReady" :to="footerPortalSelector">
+      <div ref="filterControlsRef" class="footer-controls px-2">
+        <div class="footer-inline">
+          <ClipboardListHeader
+            :summary-text="summaryText"
+            :is-loading="isLoading"
+            :active-filter-label="activeFilterLabel"
+            :has-active-filter="filterState.hasActiveFilter.value"
+            :has-items="hasItems"
+            :multi-select-mode="multiSelectMode"
+            :multi-selected-count="multiSelectedCount"
+            @toggle-filter="toggleFilterPanel"
+            @refresh="handleRefresh"
+            @toggle-multi-select="handleToggleMultiSelectMode"
+          />
+
+          <div v-if="multiSelectMode" class="multi-select-toolbar">
+            <span class="toolbar-summary">已选择 {{ multiSelectedCount }} 项</span>
+            <div class="toolbar-actions">
+              <button
+                class="toolbar-button danger"
+                type="button"
+                :disabled="!multiSelectedCount || bulkDeletePending"
+                @click="handleBulkDeleteSelected"
+              >
+                <span class="i-carbon-trash-can" aria-hidden="true" />
+                {{ bulkDeletePending ? '删除中…' : '删除所选' }}
+              </button>
+              <button
+                class="toolbar-button"
+                type="button"
+                :disabled="!multiSelectedCount || bulkFavoritePending"
+                @click="handleBulkFavoriteSelected"
+              >
+                <span class="i-carbon-star" aria-hidden="true" />
+                {{ bulkFavoritePending ? '处理中…' : '批量收藏' }}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </Teleport>
+
+    <div v-else ref="filterControlsRef" class="footer-controls px-2">
+      <div class="footer-inline">
         <ClipboardListHeader
           :summary-text="summaryText"
           :is-loading="isLoading"
@@ -229,56 +365,49 @@ const canDisplayLoadMore = computed(() => props.canLoadMore && !shouldDisableLoa
             </button>
           </div>
         </div>
-
-        <ClipboardListFilterPanel
-          v-if="filterState.isPanelOpen.value"
-          :items="filterState.filterMenuItems.value"
-          :selected="filterState.selectedFilter.value"
-          @select="handleFilterChange"
-        />
       </div>
-
-      <template v-if="hasItems">
-        <ClipboardSection
-          v-for="section in groupedSections"
-          :key="section.key"
-          :title="section.title"
-          :count="section.items.length"
-          :collapse-disabled="section.items.length >= 100"
-        >
-          <ClipboardItemCard
-            v-for="entry in section.items"
-            :key="getItemKey(entry.item)"
-            :item="entry.item"
-            :index="entry.globalIndex"
-            :is-active="selectedKey === getItemKey(entry.item)"
-            :is-multi-select-mode="multiSelectMode"
-            :is-multi-selected="isItemInMultiSelection(entry.item)"
-            @select="handleSelect"
-            @toggle-multi-select="handleToggleMultiSelectItem"
-          />
-        </ClipboardSection>
-      </template>
-      <ClipboardEmptyState v-else :is-loading="isLoading" />
-
-      <ClipboardLoadMore
-        :can-load-more="canDisplayLoadMore"
-        :is-loading="isLoading"
-        :is-loading-more="isLoadingMore"
-        @load-more="handleLoadMore"
-      />
     </div>
+
+    <Teleport to="body">
+      <ClipboardListFilterPanel
+        v-if="filterState.isPanelOpen.value"
+        ref="filterPanelRef"
+        :items="filterState.filterMenuItems.value"
+        :selected="filterState.selectedFilter.value"
+        :panel-style="filterPanelStyle"
+        @select="handleFilterChange"
+      />
+    </Teleport>
   </div>
 </template>
 
 <style scoped>
-.multi-select-toolbar {
-  display: flex;
+.footer-controls {
+  position: relative;
+  display: inline-flex;
   align-items: center;
-  justify-content: space-between;
   gap: 12px;
-  margin-top: 12px;
-  padding: 10px 12px;
+  width: 100%;
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.footer-inline {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: nowrap;
+  width: 100%;
+  min-width: 0;
+  white-space: nowrap;
+}
+
+.multi-select-toolbar {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 10px;
   border-radius: 14px;
   border: 1px solid var(--clipboard-border-color);
   background: var(--clipboard-surface-strong);

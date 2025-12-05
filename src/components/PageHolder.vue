@@ -23,6 +23,18 @@ defineOptions({
 
 <style lang="scss" scoped>
 .ClipboardPageHolder-Footer {
+  position: sticky;
+  bottom: 0;
+  z-index: 10;
+  width: 100%;
+  min-height: 54px;
+  padding: 10px 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  background: transparent;
+
   &::before {
     content: '';
     position: absolute;
@@ -34,15 +46,19 @@ defineOptions({
     height: 100%;
 
     backdrop-filter: blur(18px) saturate(180%);
-    background-color: var(--clipboard-color-accent-softer-fallback);
+    background: linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--clipboard-surface-strong) 88%, transparent) 0%,
+      color-mix(in srgb, var(--clipboard-surface-ghost) 92%, transparent) 100%
+    );
+    pointer-events: none;
+    z-index: 0;
   }
-  z-index: 10;
-  position: sticky;
 
-  bottom: 0;
-
-  width: 100%;
-  height: 48px;
+  :deep(*) {
+    position: relative;
+    z-index: 1;
+  }
 }
 
 .holder-aside,

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import ClipboardActionBar from '~/components/ClipboardActionBar.vue'
 import ClipboardList from '~/components/ClipboardList.vue'
 import ClipboardPreview from '~/components/ClipboardPreview.vue'
 import FullscreenLoadingOverlay from '~/components/FullscreenLoadingOverlay.vue'
@@ -13,22 +14,22 @@ const manager = useClipboardManager()
 </script>
 
 <template>
-  <div class="ClipboardManagerPage" :class="{ 'is-loading': manager?.isLoading.value }">
-    <PageHolder v-if="manager" class="manager-holder" :class="{ blurred: manager.isLoading.value }">
+  <div class="ClipboardManagerPage" :class="{ 'is-loading': manager?.isLoading }">
+    <PageHolder v-if="manager" class="manager-holder" :class="{ blurred: manager.isLoading }">
       <template #aside>
         <ClipboardList
-          :items="manager.clipboardItems.value"
-          :selected-key="manager.selectedKey.value"
-          :total="manager.total.value"
-          :page-size="manager.pageSize.value"
-          :is-loading="manager.isLoading.value"
-          :is-loading-more="manager.isLoadingMore.value"
-          :can-load-more="manager.canLoadMore.value"
-          :multi-select-mode="manager.multiSelectMode.value"
-          :multi-selected-keys="manager.multiSelectedKeys.value"
-          :multi-selected-count="manager.multiSelectedCount.value"
-          :bulk-delete-pending="manager.bulkDeletePending.value"
-          :bulk-favorite-pending="manager.bulkFavoritePending.value"
+          :items="manager.clipboardItems"
+          :selected-key="manager.selectedKey"
+          :total="manager.total"
+          :page-size="manager.pageSize"
+          :is-loading="manager.isLoading"
+          :is-loading-more="manager.isLoadingMore"
+          :can-load-more="manager.canLoadMore"
+          :multi-select-mode="manager.multiSelectMode"
+          :multi-selected-keys="manager.multiSelectedKeys"
+          :multi-selected-count="manager.multiSelectedCount"
+          :bulk-delete-pending="manager.bulkDeletePending"
+          :bulk-favorite-pending="manager.bulkFavoritePending"
           v-on="{
             select: manager.selectItem,
             refresh: manager.refreshHistory,
@@ -43,26 +44,30 @@ const manager = useClipboardManager()
 
       <template #main>
         <ClipboardPreview
-          :item="manager.selectedItem.value"
-          :favorite-pending="manager.favoritePending.value"
-          :delete-pending="manager.deletePending.value"
-          :apply-pending="manager.applyPending.value"
-          :copy-pending="manager.copyPending.value"
+          :item="manager.selectedItem"
           :format-timestamp="manager.formatTimestamp"
-          v-on="{
-            toggleFavorite: manager.toggleFavorite,
-            delete: manager.deleteSelected,
-            copy: () => manager.copyItem(),
-            apply: () => manager.applyItem(),
-          }"
         />
       </template>
 
       <template #footer>
-        1
+        <div class="ManagerFooterBar">
+          <div id="clipboard-footer-left" class="footer-left" />
+          <ClipboardActionBar
+            class="footer-right"
+            :item="manager.selectedItem"
+            :copy-pending="manager.copyPending"
+            :apply-pending="manager.applyPending"
+            :favorite-pending="manager.favoritePending"
+            :delete-pending="manager.deletePending"
+            @copy="manager.copyItem()"
+            @apply="manager.applyItem()"
+            @toggle-favorite="manager.toggleFavorite()"
+            @delete="manager.deleteSelected()"
+          />
+        </div>
       </template>
     </PageHolder>
-    <FullscreenLoadingOverlay v-if="manager?.isLoading.value" />
+    <FullscreenLoadingOverlay v-if="manager?.isLoading" />
   </div>
 </template>
 
@@ -84,5 +89,23 @@ meta:
 .ClipboardManagerPage .manager-holder.blurred {
   filter: blur(10px);
   pointer-events: none;
+}
+
+.ManagerFooterBar {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  width: 100%;
+  flex-wrap: nowrap;
+}
+
+.footer-left {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.footer-right {
+  flex: 0 0 auto;
 }
 </style>
