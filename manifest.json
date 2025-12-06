@@ -33,26 +33,6 @@
         "type": "webcontent",
         "path": "/clipboard-manager"
       }
-    },
-    {
-      "id": "clipboard-history-widget",
-      "name": "剪贴板历史记录小部件",
-      "desc": "查看和管理剪贴板历史记录",
-      "icon": {
-        "type": "file",
-        "value": "assets/logo.svg"
-      },
-      "platform": { "win32": true, "darwin": true, "linux": true },
-      "commands": [
-        {
-          "type": "over",
-          "value": ["clipboard-history-widget", "剪贴板历史记录小部件", "剪贴板"]
-        }
-      ],
-      "interaction": {
-        "type": "widget",
-        "path": "/HelloWorld.vue"
-      }
     }
   ]
 }
