@@ -1,16 +1,22 @@
 <script setup lang="ts">
+import type { useClipboardManager } from '~/composables/useClipboardManager'
+import { onMounted, ref } from 'vue'
 import ClipboardActionBar from '~/components/ClipboardActionBar.vue'
 import ClipboardList from '~/components/ClipboardList.vue'
 import ClipboardPreview from '~/components/ClipboardPreview.vue'
 import FullscreenLoadingOverlay from '~/components/FullscreenLoadingOverlay.vue'
 import PageHolder from '~/components/PageHolder.vue'
-import { useClipboardManager } from '~/composables/useClipboardManager'
 
 defineOptions({
   name: 'ClipboardManagerPage',
 })
 
-const manager = useClipboardManager()
+const manager = ref<ReturnType<typeof useClipboardManager> | null>(null)
+
+onMounted(async () => {
+  const { useClipboardManager: useClipboardManagerImpl } = await import('~/composables/useClipboardManager')
+  manager.value = useClipboardManagerImpl()
+})
 </script>
 
 <template>

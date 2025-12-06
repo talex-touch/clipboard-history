@@ -145,9 +145,9 @@ export default defineConfig({
   ssgOptions: {
     script: 'async',
     formatting: 'minify',
-    beastiesOptions: {
-      reduceInlineStyles: false,
-    },
+    // beastiesOptions: {
+    //   reduceInlineStyles: false,
+    // },
     onFinished() {
       generateSitemap()
     },
@@ -155,6 +155,6 @@ export default defineConfig({
 
   ssr: {
     // TODO: workaround until they support native ESM
-    noExternal: ['workbox-window', /^@talex-touch\//],
+    noExternal: ['workbox-window', /^@talex-touch\//, 'beasties', '@ungap/structured-clone', 'vue-sonner'],
   },
 })
