@@ -6,7 +6,6 @@ import { useEventListener } from '@vueuse/core'
 import {
   nextTick,
   onBeforeUnmount,
-  onMounted,
   reactive,
   toRaw,
   watch,
@@ -18,6 +17,7 @@ import { formatTimestamp, getItemKey } from './clipboardUtils'
 
 type ClipboardHistoryClient = ReturnType<typeof useClipboardHistory> & {
   applyToActiveApp?: (options: { item?: PluginClipboardItem }) => Promise<boolean>
+  copyAndPaste?: (options: { text?: string, html?: string, image?: Blob }) => Promise<boolean>
 }
 
 interface LoadHistoryOptions {
@@ -281,11 +281,18 @@ export function useClipboardManager() {
       setSelection(state.clipboardItems[0])
   }
 
-  function selectByIndex(index: number) {
+  function selectByIndex(index: number, allowWrap = true) {
     if (!state.clipboardItems.length)
       return
 
-    const normalizedIndex = (index + state.clipboardItems.length) % state.clipboardItems.length
+    let normalizedIndex: number
+    if (allowWrap) {
+      normalizedIndex = (index + state.clipboardItems.length) % state.clipboardItems.length
+    }
+    else {
+      // Clamp to valid range without wrapping
+      normalizedIndex = Math.max(0, Math.min(index, state.clipboardItems.length - 1))
+    }
     const nextItem = state.clipboardItems[normalizedIndex]
     if (nextItem)
       setSelection(nextItem)
@@ -297,19 +304,21 @@ export function useClipboardManager() {
 
     if (event.key === 'ArrowDown') {
       event.preventDefault()
-      selectByIndex((state.activeIndex === -1 ? 0 : state.activeIndex) + 1)
+      // Allow wrap from last to first when pressing down
+      selectByIndex((state.activeIndex === -1 ? 0 : state.activeIndex) + 1, true)
     }
     else if (event.key === 'ArrowUp') {
       event.preventDefault()
-      selectByIndex((state.activeIndex === -1 ? state.clipboardItems.length - 1 : state.activeIndex) - 1)
+      // Do NOT allow wrap from first to last when pressing up
+      selectByIndex((state.activeIndex === -1 ? 0 : state.activeIndex) - 1, false)
     }
     else if (event.key === 'Home') {
       event.preventDefault()
-      selectByIndex(0)
+      selectByIndex(0, false)
     }
     else if (event.key === 'End') {
       event.preventDefault()
-      selectByIndex(state.clipboardItems.length - 1)
+      selectByIndex(state.clipboardItems.length - 1, false)
     }
   }
 
@@ -343,13 +352,15 @@ export function useClipboardManager() {
     if (event.key === 'Enter') {
       event.preventDefault()
       if (event.metaKey || event.ctrlKey) {
-        const applied = await applyItem()
-        if (applied)
+        // ⌘+Enter -> 复制到剪贴板
+        const copied = await copyItem()
+        if (copied)
           await hideCoreBoxWindow()
       }
       else {
-        const copied = await copyItem()
-        if (copied)
+        // Enter -> 粘贴到当前应用
+        const applied = await applyItem()
+        if (applied)
           await hideCoreBoxWindow()
       }
       return
@@ -448,6 +459,29 @@ export function useClipboardManager() {
     try {
       const payload = cloneClipboardItem(item)
 
+      // 优先使用新的 copyAndPaste API
+      if (typeof clipboard.copyAndPaste === 'function') {
+        let success = false
+        if (item.type === 'image') {
+          const blob = await resolveImageBlob(item)
+          success = await clipboard.copyAndPaste({ image: blob })
+        }
+        else if (item.type === 'text' && item.rawContent) {
+          success = await clipboard.copyAndPaste({
+            text: item.content ?? '',
+            html: item.rawContent,
+          })
+        }
+        else {
+          success = await clipboard.copyAndPaste({ text: item.content ?? '' })
+        }
+        if (!success)
+          throw new Error('自动粘贴失败')
+        toast.success('已粘贴到当前应用')
+        return true
+      }
+
+      // 回退到旧的 applyToActiveApp API
       if (typeof clipboard.applyToActiveApp === 'function') {
         const success = await clipboard.applyToActiveApp({
           item: payload,
@@ -455,9 +489,11 @@ export function useClipboardManager() {
         })
         if (!success)
           throw new Error('自动粘贴失败')
+        toast.success('已粘贴到当前应用')
         return true
       }
 
+      // 最后回退到 channel
       const channel = resolvePluginChannel()
       if (!channel)
         throw new Error('无法调用自动粘贴通道')
@@ -469,6 +505,7 @@ export function useClipboardManager() {
       if (response && typeof response === 'object' && 'success' in response && !response.success)
         throw new Error((response as { message?: string }).message ?? '自动粘贴失败')
 
+      toast.success('已粘贴到当前应用')
       return true
     }
     catch (error) {
@@ -494,6 +531,7 @@ export function useClipboardManager() {
     try {
       const payload = cloneClipboardItem(item)
       await writeClipboardFromItem(payload)
+      toast.success('已复制到剪贴板')
       return true
     }
     catch (error) {
@@ -532,6 +570,7 @@ export function useClipboardManager() {
         })
         state.selectedItem = { ...state.selectedItem, isFavorite: nextState }
       }
+      toast.success(nextState ? '已添加到收藏' : '已取消收藏')
     }
     catch (error) {
       state.errorMessage = formatError(error)
@@ -555,6 +594,7 @@ export function useClipboardManager() {
       state.clipboardItems = state.clipboardItems.filter((item: any) => getItemKey(item) !== key)
       state.total = Math.max(0, state.total - 1)
       ensureSelection()
+      toast.success('已删除')
     }
     catch (error) {
       state.errorMessage = formatError(error)
@@ -612,6 +652,7 @@ export function useClipboardManager() {
         ensureSelection()
       else
         ensureSelection(state.selectedKey ?? undefined)
+      toast.success(`已删除 ${deletedCount} 条记录`)
     }
     catch (error) {
       state.errorMessage = formatError(error)
@@ -646,6 +687,7 @@ export function useClipboardManager() {
 
       if (state.selectedItem && targetKeys.has(getItemKey(state.selectedItem)))
         state.selectedItem = { ...state.selectedItem, isFavorite: true }
+      toast.success(`已收藏 ${itemsToFavorite.length} 条记录`)
     }
     catch (error) {
       state.errorMessage = formatError(error)
@@ -690,11 +732,14 @@ export function useClipboardManager() {
     await loadHistory({ reset: true, showInitialSpinner: true })
   })
 
-  onMounted(async () => {
-    await bootstrap()
-    if (typeof document !== 'undefined')
-      stopHotkeys = useEventListener(() => document.body, 'keydown', handleHotkeys)
-  })
+  // 直接注册事件监听器，因为这个 composable 可能在 onMounted 回调中被调用
+  // 在这种情况下，内部的 onMounted 不会被正确执行
+  if (typeof document !== 'undefined' && !import.meta.env.SSR) {
+    // 立即启动 bootstrap
+    bootstrap()
+    // 注册键盘事件监听器
+    stopHotkeys = useEventListener(document, 'keydown', handleHotkeys)
+  }
 
   onBeforeUnmount(() => {
     stopClipboardListener?.()

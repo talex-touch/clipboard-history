@@ -10,7 +10,7 @@ catalogs:
     '@intlify/unplugin-vue-i18n': ^6.0.8
     '@shikijs/markdown-it': ^3.17.0
     '@unocss/eslint-config': ^66.5.9
-    '@vitejs/plugin-vue': catalog:build
+    '@vitejs/plugin-vue': ^6.0.2
     beasties: ^0.2.0
     markdown-it-link-attributes: ^4.0.1
     rollup: ^4.53.3
@@ -72,6 +72,8 @@ catalogs:
     '@types/nprogress': ^0.2.3
   conflicts_build_h6_0_2:
     '@vitejs/plugin-vue': ^6.0.2
+  conflicts_conflicts_@talex-touch/utils_h1_0_35_h1_0_40:
+    '@talex-touch/utils': ^1.0.40
 
 onlyBuiltDependencies:
   - cypress

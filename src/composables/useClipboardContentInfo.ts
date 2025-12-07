@@ -178,12 +178,22 @@ function parseDataUrl(value: string): ParsedDataUrl | null {
   }
 }
 
+// Only accept common URL protocols to avoid false positives like "border: 1px solid"
+const validUrlProtocols = new Set(['http:', 'https:', 'ftp:', 'ftps:', 'file:', 'mailto:', 'tel:', 'ssh:', 'git:'])
+
 function parseUrl(value: string): URL | null {
+  // Quick check: must start with a valid protocol pattern
+  if (!/^[a-z][a-z0-9+.-]*:/i.test(value))
+    return null
+
   try {
-    return new URL(value)
+    const url = new URL(value)
+    // Only accept known protocols to avoid false positives
+    if (!validUrlProtocols.has(url.protocol.toLowerCase()))
+      return null
+    return url
   }
-  // eslint-disable-next-line unused-imports/no-unused-vars
-  catch (error) {
+  catch {
     return null
   }
 }

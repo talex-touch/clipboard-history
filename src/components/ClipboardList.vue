@@ -143,6 +143,14 @@ if (typeof document !== 'undefined') {
   useEventListener(document, 'keydown', (event: KeyboardEvent) => {
     if (event.key === 'Escape' && filterState.isPanelOpen.value)
       filterState.closePanel()
+
+    // Prevent default scroll behavior for arrow keys to allow list navigation
+    if (['ArrowUp', 'ArrowDown', 'Home', 'End'].includes(event.key)) {
+      const target = event.target as HTMLElement | null
+      if (target?.tagName !== 'INPUT' && target?.tagName !== 'TEXTAREA' && !target?.isContentEditable) {
+        event.preventDefault()
+      }
+    }
   })
 
   useEventListener(document.defaultView ?? window, 'resize', () => {

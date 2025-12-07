@@ -17,7 +17,7 @@
     "sizecheck": "npx vite-bundle-visualizer"
   },
   "dependencies": {
-    "@talex-touch/utils": "catalog:conflicts_conflicts_@talex-touch/utils_h1_0_35_h1_0_39",
+    "@talex-touch/utils": "catalog:conflicts_@talex-touch/utils_h1_0_35",
     "@unhead/vue": "catalog:frontend",
     "@unocss/reset": "catalog:frontend",
     "@vitejs/plugin-vue": "catalog:build",
