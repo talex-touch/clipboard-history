@@ -3,7 +3,7 @@ const { $util, console, TuffItemBuilder } = globalThis
 /**
  * Mocks a translation.
  * @param {string} text The text to translate.
- * @returns {Promise<{text: string, from: string, to: string}>}
+ * @returns {Promise<{text: string, from: string, to: string}>} Promise resolving to mocked translation payload.
  */
 async function mockTranslate(text) {
   const isChinese = /[\u4E00-\u9FFF]/.test(text)
@@ -55,13 +55,16 @@ async function handleTranslation(featureId, query, signal) {
 const pluginLifecycle = {
   /**
    * @param {string} featureId
-   * @param {string} query
+   * @param {string | { text?: string, inputs?: Array<{ type: string, content: string }> }} query
    * @param {any} feature
    * @param {AbortSignal} signal
    */
   async onFeatureTriggered(featureId, query, feature, signal) {
-    if (featureId === 'touch-translate' && query && query.trim()) {
-      await handleTranslation(featureId, query.trim(), signal)
+    // 兼容 TuffQuery 新格式
+    const queryText = typeof query === 'string' ? query : (query?.text ?? '')
+
+    if (featureId === 'touch-translate' && queryText && queryText.trim()) {
+      await handleTranslation(featureId, queryText.trim(), signal)
     }
   },
 }

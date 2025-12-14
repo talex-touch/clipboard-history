@@ -2,11 +2,19 @@
   "id": "com.tuffex.clipboard-history",
   "name": "clipboard-history",
   "version": "1.0.0",
+  "sdkapi": 251212,
   "icon": {
     "type": "file",
     "value": "assets/logo.svg"
   },
   "description": "一款全平台剪贴板历史记录插件，从 tuff 核心提取剪贴板历史。",
+  "permissions": {
+    "required": ["clipboard.read"],
+    "optional": []
+  },
+  "permissionReasons": {
+    "clipboard.read": "读取剪贴板历史记录内容"
+  },
   "dev": {
     "enable": true,
     "address": "http://localhost:3488/#/",
@@ -22,6 +30,7 @@
         "value": "assets/logo.svg"
       },
       "push": true,
+      "acceptedInputTypes": ["text", "image", "files", "html"],
       "platform": { "win32": true, "darwin": true, "linux": true },
       "commands": [
         {

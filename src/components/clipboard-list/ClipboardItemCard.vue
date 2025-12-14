@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { PluginClipboardItem } from '@talex-touch/utils/plugin/sdk/types'
-import { computed } from 'vue'
+import { useIntersectionObserver } from '@vueuse/core'
+import { computed, ref, watch } from 'vue'
 import { getItemKey } from '~/composables/clipboardUtils'
 import { useClipboardContentInfo } from '~/composables/useClipboardContentInfo'
 
@@ -148,11 +149,48 @@ function handleClick() {
   }
   emit('select', props.item)
 }
+
+// Progressive image loading
+const cardRef = ref<HTMLElement | null>(null)
+const isVisible = ref(false)
+const imageLoaded = ref(false)
+const imageError = ref(false)
+
+// Use intersection observer for lazy loading
+useIntersectionObserver(
+  cardRef,
+  ([{ isIntersecting }]) => {
+    if (isIntersecting && !isVisible.value) {
+      isVisible.value = true
+    }
+  },
+  {
+    rootMargin: '100px',
+    threshold: 0.1,
+  },
+)
+
+function handleImageLoad() {
+  imageLoaded.value = true
+}
+
+function handleImageError() {
+  imageError.value = true
+}
+
+const shouldShowImage = computed(() => isVisible.value && previewImage.value && !imageError.value)
+
+// Reset image loading state when item changes
+watch(() => props.item.id, () => {
+  imageLoaded.value = false
+  imageError.value = false
+})
 </script>
 
 <template>
   <li
     :id="`clipboard-item-${itemKey}`"
+    ref="cardRef"
     :data-item-id="itemKey"
     role="option"
     :aria-selected="isActive"
@@ -163,12 +201,23 @@ function handleClick() {
   >
     <div
       class="item-icon h-7 w-7 flex items-center justify-center rounded-xl text-lg transition-colors"
-      :class="{ 'has-image': previewImage }"
+      :class="{ 'has-image': shouldShowImage && imageLoaded }"
       aria-hidden="true"
     >
-      <img v-if="previewImage" :src="previewImage" alt="" draggable="false">
-      <span v-else :class="iconClass" class="icon" />
-      <span v-if="!previewImage && colorSwatch" class="color-chip" :style="{ background: colorSwatch }" />
+      <!-- Progressive image loading with skeleton -->
+      <template v-if="shouldShowImage">
+        <div v-if="!imageLoaded" class="image-skeleton" />
+        <img
+          :src="previewImage!"
+          alt=""
+          draggable="false"
+          :class="{ 'image-loading': !imageLoaded }"
+          @load="handleImageLoad"
+          @error="handleImageError"
+        >
+      </template>
+      <span v-else-if="!previewImage || imageError" :class="iconClass" class="icon" />
+      <span v-if="(!shouldShowImage || imageError) && colorSwatch" class="color-chip" :style="{ background: colorSwatch }" />
     </div>
     <div class="item-body min-w-0 flex flex-col gap-1">
       <p class="item-preview truncate text-sm" :title="previewText">
@@ -232,6 +281,34 @@ function handleClick() {
   height: 100%;
   object-fit: cover;
   border-radius: inherit;
+}
+
+.ClipboardItem .item-icon .image-skeleton {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    var(--clipboard-surface-strong) 25%,
+    var(--clipboard-surface-ghost) 50%,
+    var(--clipboard-surface-strong) 75%
+  );
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.5s infinite;
+  border-radius: inherit;
+}
+
+.ClipboardItem .item-icon img.image-loading {
+  opacity: 0;
+  position: absolute;
+}
+
+@keyframes skeleton-shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
 }
 
 .ClipboardItem .item-icon .icon {

@@ -267,11 +267,18 @@ const fallbackFileDisplay = computed(() => {
 })
 
 const previewText = computed(() => props.item?.content ?? '')
-const imageSrc = computed(() => {
+
+// Thumbnail for fast initial display
+const thumbnailSrc = computed(() => {
   if (!props.item)
     return ''
-  if (props.item.thumbnail)
-    return props.item.thumbnail
+  return props.item.thumbnail || ''
+})
+
+// Full resolution image source
+const fullImageSrc = computed(() => {
+  if (!props.item)
+    return ''
   const content = typeof props.item.content === 'string' ? props.item.content : ''
   if (primaryType.value === 'image') {
     if (/^(?:data|https?|blob):/i.test(content))
@@ -332,7 +339,8 @@ const isLinkType = computed(() =>
         />
         <PreviewImage
           v-else-if="derivedType === 'data-url-image' || primaryType === 'image'"
-          :src="imageSrc || item.content"
+          :thumbnail="thumbnailSrc"
+          :src="fullImageSrc || item.content"
         />
         <PreviewFiles
           v-else-if="isFileType"
