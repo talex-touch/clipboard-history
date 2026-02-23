@@ -4,12 +4,16 @@ import { onMounted, ref } from 'vue'
 import ClipboardActionBar from '~/components/ClipboardActionBar.vue'
 import ClipboardList from '~/components/ClipboardList.vue'
 import ClipboardPreview from '~/components/ClipboardPreview.vue'
+import CommandPalette from '~/components/CommandPalette.vue'
 import FullscreenLoadingOverlay from '~/components/FullscreenLoadingOverlay.vue'
 import PageHolder from '~/components/PageHolder.vue'
+import { useCommandPaletteProvider } from '~/composables/useCommandPalette'
 
 defineOptions({
   name: 'ClipboardManagerPage',
 })
+
+useCommandPaletteProvider()
 
 const manager = ref<ReturnType<typeof useClipboardManager> | null>(null)
 
@@ -21,6 +25,7 @@ onMounted(async () => {
 
 <template>
   <div class="ClipboardManagerPage" :class="{ 'is-loading': manager?.isLoading }">
+    <CommandPalette />
     <PageHolder v-if="manager" class="manager-holder" :class="{ blurred: manager.isLoading }">
       <template #aside>
         <ClipboardList

@@ -1,21 +1,21 @@
 packages: []
 
 catalog:
-  '@talex-touch/unplugin-export-plugin': ^1.2.14
-  '@talex-touch/utils': ^1.0.34
-  sass-embedded: ^1.93.3
+  '@talex-touch/unplugin-export-plugin': ^1.2.15
+  '@talex-touch/utils': ^1.0.44
+  sass-embedded: ^1.96.0
 
 catalogs:
   build:
     '@intlify/unplugin-vue-i18n': ^6.0.8
-    '@shikijs/markdown-it': ^3.17.0
-    '@unocss/eslint-config': ^66.5.9
-    '@vitejs/plugin-vue': ^6.0.2
+    '@shikijs/markdown-it': ^3.20.0
+    '@unocss/eslint-config': ^66.5.10
+    '@vitejs/plugin-vue': ^6.0.3
     beasties: ^0.2.0
     markdown-it-link-attributes: ^4.0.1
     rollup: ^4.53.3
-    shiki: ^3.17.0
-    unocss: ^66.5.9
+    shiki: ^3.20.0
+    unocss: ^66.5.10
     unplugin: ^2.3.11
     unplugin-auto-import: ^19.3.0
     unplugin-vue-components: ^28.8.0
@@ -31,25 +31,29 @@ catalogs:
     vite-ssg: ^26.1.1
     vite-ssg-sitemap: ^0.8.1
   conflicts_@talex-touch/utils_h1_0_35:
-    '@talex-touch/utils': ^1.0.35
+    '@talex-touch/utils': ^1.0.44
+  conflicts_build_h6_0_2:
+    '@vitejs/plugin-vue': ^6.0.3
   conflicts_conflicts_@talex-touch/utils_h1_0_35_h1_0_36:
-    '@talex-touch/utils': ^1.0.36
+    '@talex-touch/utils': ^1.0.44
   conflicts_conflicts_@talex-touch/utils_h1_0_35_h1_0_37:
-    '@talex-touch/utils': ^1.0.37
+    '@talex-touch/utils': ^1.0.44
   conflicts_conflicts_@talex-touch/utils_h1_0_35_h1_0_38:
-    '@talex-touch/utils': ^1.0.38
+    '@talex-touch/utils': ^1.0.44
   conflicts_conflicts_@talex-touch/utils_h1_0_35_h1_0_39:
-    '@talex-touch/utils': ^1.0.39
+    '@talex-touch/utils': ^1.0.44
+  conflicts_conflicts_@talex-touch/utils_h1_0_35_h1_0_40:
+    '@talex-touch/utils': ^1.0.44
   dev:
     '@antfu/eslint-config': ^4.19.0
-    '@iconify-json/carbon': ^1.2.14
+    '@iconify-json/carbon': ^1.2.15
     '@vue-macros/volar': ^3.1.1
     '@vue/test-utils': ^2.4.6
     cypress: ^14.5.4
     cypress-vite: ^1.8.0
-    eslint: ^9.39.1
+    eslint: ^9.39.2
     eslint-plugin-cypress: ^4.3.0
-    eslint-plugin-format: ^1.0.2
+    eslint-plugin-format: ^1.1.0
     https-localhost: ^4.7.1
     lint-staged: ^15.5.2
     simple-git-hooks: ^2.13.1
@@ -59,21 +63,19 @@ catalogs:
     vue-tsc: ^2.2.12
   frontend:
     '@unhead/vue': ^2.0.19
-    '@unocss/reset': ^66.5.9
+    '@unocss/reset': ^66.5.10
     '@vueuse/core': ^13.9.0
     nprogress: ^0.2.0
     pinia: ^3.0.4
     vue: ^3.5.25
     vue-i18n: ^11.2.2
-    vue-router: ^4.6.3
+    vue-router: ^4.6.4
     vue-sonner: ^2.0.9
   types:
     '@types/markdown-it-link-attributes': ^3.0.5
     '@types/nprogress': ^0.2.3
-  conflicts_build_h6_0_2:
-    '@vitejs/plugin-vue': ^6.0.2
-  conflicts_conflicts_@talex-touch/utils_h1_0_35_h1_0_40:
-    '@talex-touch/utils': ^1.0.40
+  conflicts_conflicts_@talex-touch/utils_h1_0_35_1_0_44:
+    '@talex-touch/utils': 1.0.44
 
 onlyBuiltDependencies:
   - cypress

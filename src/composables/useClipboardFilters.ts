@@ -37,7 +37,7 @@ export function useClipboardFilters(config: UseClipboardFiltersConfig) {
       if (item.isFavorite)
         counts.favorites += 1
 
-      switch (item.type) {
+      switch (item.type as string) {
         case 'text':
           counts.text += 1
           break
@@ -73,9 +73,9 @@ export function useClipboardFilters(config: UseClipboardFiltersConfig) {
       return allItems.filter(item => item.isFavorite)
 
     if (activeFilter === 'files')
-      return allItems.filter(item => item.type === 'file' || item.type === 'files')
+      return allItems.filter(item => (item.type as string) === 'file' || item.type === 'files')
 
-    return allItems.filter(item => item.type === activeFilter)
+    return allItems.filter(item => (item.type as string) === activeFilter)
   })
 
   const filterMenuItems = computed<FilterMenuItem[]>(() =>

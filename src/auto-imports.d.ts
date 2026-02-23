@@ -93,6 +93,7 @@ declare global {
   const refDefault: typeof import('@vueuse/core')['refDefault']
   const refThrottled: typeof import('@vueuse/core')['refThrottled']
   const refWithControl: typeof import('@vueuse/core')['refWithControl']
+  const resolveCommandValue: typeof import('./composables/useCommandPalette')['resolveCommandValue']
   const resolveComponent: typeof import('vue')['resolveComponent']
   const resolveRef: typeof import('@vueuse/core')['resolveRef']
   const resolveUnref: typeof import('@vueuse/core')['resolveUnref']
@@ -152,6 +153,8 @@ declare global {
   const useClipboardSections: typeof import('./composables/useClipboardSections')['useClipboardSections']
   const useCloned: typeof import('@vueuse/core')['useCloned']
   const useColorMode: typeof import('@vueuse/core')['useColorMode']
+  const useCommandPalette: typeof import('./composables/useCommandPalette')['useCommandPalette']
+  const useCommandPaletteProvider: typeof import('./composables/useCommandPalette')['useCommandPaletteProvider']
   const useConfirmDialog: typeof import('@vueuse/core')['useConfirmDialog']
   const useCountdown: typeof import('@vueuse/core')['useCountdown']
   const useCounter: typeof import('@vueuse/core')['useCounter']
@@ -333,6 +336,9 @@ declare global {
   // @ts-ignore
   export type { SectionDefinition, SectionEntry, GroupedSection, UseClipboardSectionsConfig } from './composables/useClipboardSections'
   import('./composables/useClipboardSections')
+  // @ts-ignore
+  export type { CommandPaletteValueResolver, CommandPaletteCommand, CommandPaletteState } from './composables/useCommandPalette'
+  import('./composables/useCommandPalette')
 }
 
 // for vue template auto import
@@ -424,6 +430,7 @@ declare module 'vue' {
     readonly refDefault: UnwrapRef<typeof import('@vueuse/core')['refDefault']>
     readonly refThrottled: UnwrapRef<typeof import('@vueuse/core')['refThrottled']>
     readonly refWithControl: UnwrapRef<typeof import('@vueuse/core')['refWithControl']>
+    readonly resolveCommandValue: UnwrapRef<typeof import('./composables/useCommandPalette')['resolveCommandValue']>
     readonly resolveComponent: UnwrapRef<typeof import('vue')['resolveComponent']>
     readonly resolveRef: UnwrapRef<typeof import('@vueuse/core')['resolveRef']>
     readonly resolveUnref: UnwrapRef<typeof import('@vueuse/core')['resolveUnref']>
@@ -483,6 +490,8 @@ declare module 'vue' {
     readonly useClipboardSections: UnwrapRef<typeof import('./composables/useClipboardSections')['useClipboardSections']>
     readonly useCloned: UnwrapRef<typeof import('@vueuse/core')['useCloned']>
     readonly useColorMode: UnwrapRef<typeof import('@vueuse/core')['useColorMode']>
+    readonly useCommandPalette: UnwrapRef<typeof import('./composables/useCommandPalette')['useCommandPalette']>
+    readonly useCommandPaletteProvider: UnwrapRef<typeof import('./composables/useCommandPalette')['useCommandPaletteProvider']>
     readonly useConfirmDialog: UnwrapRef<typeof import('@vueuse/core')['useConfirmDialog']>
     readonly useCountdown: UnwrapRef<typeof import('@vueuse/core')['useCountdown']>
     readonly useCounter: UnwrapRef<typeof import('@vueuse/core')['useCounter']>

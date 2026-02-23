@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import SyncIndicator from '~/components/SyncIndicator.vue'
+import { useCommandPalette } from '~/composables/useCommandPalette'
 
 const props = defineProps<{
   summaryText: string
@@ -10,6 +11,9 @@ const props = defineProps<{
   hasItems: boolean
   multiSelectMode: boolean
   multiSelectedCount: number
+  showRefresh?: boolean
+  showMultiSelectToggle?: boolean
+  showCommandPaletteTrigger?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -17,6 +21,8 @@ const emit = defineEmits<{
   (event: 'refresh'): void
   (event: 'toggleMultiSelect'): void
 }>()
+
+const palette = useCommandPalette()
 
 function handleToggleFilter() {
   emit('toggleFilter')
@@ -39,6 +45,14 @@ const multiSelectLabel = computed(() => {
   }
   return '多选'
 })
+
+const displayRefresh = computed(() => props.showRefresh !== false)
+const displayMultiSelect = computed(() => props.showMultiSelectToggle !== false)
+const displayCommandPaletteTrigger = computed(() => props.showCommandPaletteTrigger === true)
+
+function handleOpenPalette() {
+  palette?.open()
+}
 </script>
 
 <template>
@@ -58,8 +72,19 @@ const multiSelectLabel = computed(() => {
         <span class="i-carbon-filter text-sm" aria-hidden="true" />
         {{ activeFilterLabel }}
       </button>
+      <button
+        v-if="displayCommandPaletteTrigger"
+        class="command-toggle inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold transition"
+        type="button"
+        @click="handleOpenPalette"
+      >
+        <span class="i-carbon-command text-sm" aria-hidden="true" />
+        操作
+        <span class="shortcut-hint">⌘ K</span>
+      </button>
       <SyncIndicator v-if="isLoading" size="sm" />
       <button
+        v-if="displayRefresh"
         class="icon-button"
         type="button"
         :disabled="isLoading"
@@ -68,6 +93,7 @@ const multiSelectLabel = computed(() => {
         <span class="i-carbon-renew block" aria-hidden="true" />
       </button>
       <button
+        v-if="displayMultiSelect"
         class="multi-select-toggle inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold transition"
         :class="{ active: multiSelectMode }"
         type="button"
@@ -95,6 +121,7 @@ const multiSelectLabel = computed(() => {
 }
 
 .filter-toggle,
+.command-toggle,
 .multi-select-toggle {
   border: 1px solid var(--clipboard-border-color);
   background: var(--clipboard-surface-subtle);
@@ -103,6 +130,7 @@ const multiSelectLabel = computed(() => {
 }
 
 .filter-toggle:hover,
+.command-toggle:hover,
 .multi-select-toggle:hover {
   border-color: var(--clipboard-color-accent, #6366f1);
   background: var(--clipboard-color-accent-softer-fallback);
@@ -116,6 +144,14 @@ const multiSelectLabel = computed(() => {
   background: var(--clipboard-color-accent-soft-fallback);
   background: color-mix(in srgb, var(--clipboard-color-accent, #6366f1) 14%, transparent);
   color: var(--clipboard-color-accent-strong, var(--clipboard-color-accent, #6366f1));
+}
+
+.shortcut-hint {
+  margin-left: 4px;
+  color: var(--clipboard-text-muted);
+  font-size: 0.74rem;
+  font-weight: 650;
+  line-height: 1;
 }
 
 .multi-select-toggle:disabled {

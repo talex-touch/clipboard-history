@@ -1,7 +1,8 @@
 {
   "type": "module",
+  "version": "1.1.0",
   "private": true,
-  "packageManager": "pnpm@10.24.0",
+  "packageManager": "pnpm@10.25.0",
   "scripts": {
     "build": "vite-ssg build && tuff builder",
     "dev": "vite --port 3488 --open",
@@ -22,7 +23,6 @@
     "@unocss/reset": "catalog:frontend",
     "@vitejs/plugin-vue": "catalog:build",
     "@vueuse/core": "catalog:frontend",
-    "latest": "link:@talex-touch/utils/latest",
     "nprogress": "catalog:frontend",
     "pinia": "catalog:frontend",
     "vue": "catalog:frontend",

@@ -2,6 +2,7 @@
 import type { PluginClipboardItem } from '@talex-touch/utils/plugin/sdk/types'
 import { getActiveAppSnapshot } from '@talex-touch/utils/plugin/sdk'
 import { computed, onMounted, ref } from 'vue'
+import { useCommandPalette } from '~/composables/useCommandPalette'
 
 const props = defineProps<{
   item: PluginClipboardItem | null
@@ -33,6 +34,7 @@ const deleteButtonLabel = computed(() => (props.deletePending ? '删除中…' :
 const isFavorite = computed(() => !!props.item?.isFavorite)
 const hasItem = computed(() => !!props.item)
 const hasPersistedItem = computed(() => !!props.item?.id)
+const palette = useCommandPalette()
 
 function handleCopy() {
   emit('copy')
@@ -48,6 +50,55 @@ function handleToggleFavorite() {
 
 function handleDelete() {
   emit('delete')
+}
+
+function handleOpenPalette() {
+  palette?.open()
+}
+
+if (palette) {
+  palette.register({
+    id: 'clipboard.item.copy',
+    group: '当前条目',
+    title: () => copyButtonLabel.value,
+    description: '复制到剪贴板',
+    icon: () => (props.copyPending ? 'i-carbon-time' : 'i-carbon-copy'),
+    shortcut: '⌘ Enter',
+    enabled: () => hasItem.value && !props.copyPending,
+    action: handleCopy,
+  })
+
+  palette.register({
+    id: 'clipboard.item.paste',
+    group: '当前条目',
+    title: () => pasteButtonLabel.value,
+    description: () => `目标：${pasteTargetName.value}`,
+    icon: () => (props.applyPending ? 'i-carbon-time' : 'i-carbon-paste'),
+    shortcut: 'Enter',
+    enabled: () => hasItem.value && !props.applyPending,
+    action: handleApply,
+  })
+
+  palette.register({
+    id: 'clipboard.item.favorite',
+    group: '当前条目',
+    title: () => favoriteButtonLabel.value,
+    description: () => (hasPersistedItem.value ? '切换收藏状态' : '当前条目不可收藏'),
+    icon: () => (isFavorite.value ? 'i-carbon-star-filled' : 'i-carbon-star'),
+    enabled: () => hasPersistedItem.value && !props.favoritePending,
+    action: handleToggleFavorite,
+  })
+
+  palette.register({
+    id: 'clipboard.item.delete',
+    group: '当前条目',
+    title: () => deleteButtonLabel.value,
+    description: () => (hasPersistedItem.value ? '删除当前条目' : '当前条目不可删除'),
+    icon: () => (props.deletePending ? 'i-carbon-time' : 'i-carbon-delete'),
+    danger: true,
+    enabled: () => hasPersistedItem.value && !props.deletePending,
+    action: handleDelete,
+  })
 }
 
 onMounted(async () => {
@@ -94,23 +145,11 @@ onMounted(async () => {
       <button
         class="surface-button icon-only"
         type="button"
-        :disabled="favoritePending || !hasPersistedItem"
-        :title="favoriteButtonLabel"
-        :aria-label="favoriteButtonLabel"
-        :class="{ 'is-active': isFavorite }"
-        @click="handleToggleFavorite"
+        title="更多操作（⌘ K）"
+        aria-label="更多操作"
+        @click="handleOpenPalette"
       >
-        <span class="button-icon" :class="isFavorite ? 'i-carbon-star-filled' : 'i-carbon-star'" aria-hidden="true" />
-      </button>
-      <button
-        class="surface-button danger icon-only"
-        type="button"
-        :disabled="deletePending || !hasPersistedItem"
-        :title="deleteButtonLabel"
-        :aria-label="deleteButtonLabel"
-        @click="handleDelete"
-      >
-        <span class="button-icon" :class="deletePending ? 'i-carbon-time' : 'i-carbon-delete'" aria-hidden="true" />
+        <span class="button-icon i-carbon-command" aria-hidden="true" />
       </button>
     </div>
   </div>

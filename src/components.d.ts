@@ -17,6 +17,7 @@ declare module 'vue' {
     ClipboardLoadMore: typeof import('./components/clipboard-list/ClipboardLoadMore.vue')['default']
     ClipboardPreview: typeof import('./components/ClipboardPreview.vue')['default']
     ClipboardSection: typeof import('./components/clipboard-list/ClipboardSection.vue')['default']
+    CommandPalette: typeof import('./components/CommandPalette.vue')['default']
     FullscreenLoadingOverlay: typeof import('./components/FullscreenLoadingOverlay.vue')['default']
     PageHolder: typeof import('./components/PageHolder.vue')['default']
     PreviewColor: typeof import('./components/clipboard-preview/PreviewColor.vue')['default']
@@ -30,5 +31,6 @@ declare module 'vue' {
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterView: typeof import('vue-router')['RouterView']
     SyncIndicator: typeof import('./components/SyncIndicator.vue')['default']
+    TheCounter: typeof import('./components/TheCounter.vue')['default']
   }
 }

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { PluginClipboardItem } from '@talex-touch/utils'
+import type { PluginClipboardItem } from '@talex-touch/utils/plugin/sdk/types'
 import type { FilterOption } from '~/composables/useClipboardFilters'
 import type { SectionDefinition } from '~/composables/useClipboardSections'
 import { onClickOutside, useEventListener } from '@vueuse/core'
@@ -13,6 +13,7 @@ import ClipboardSection from '~/components/clipboard-list/ClipboardSection.vue'
 import { getItemKey } from '~/composables/clipboardUtils'
 import { useClipboardFilters } from '~/composables/useClipboardFilters'
 import { useClipboardSections } from '~/composables/useClipboardSections'
+import { useCommandPalette } from '~/composables/useCommandPalette'
 
 type FilterValue = ReturnType<typeof useClipboardFilters>['selectedFilter']['value']
 
@@ -75,6 +76,8 @@ const filterState = useClipboardFilters({
   items: () => props.items,
   filterOptions,
 })
+
+const palette = useCommandPalette()
 
 const { groupedSections } = useClipboardSections({
   items: () => filterState.filteredItems.value,
@@ -226,6 +229,62 @@ function isItemInMultiSelection(item: PluginClipboardItem) {
   return multiSelectedSet.value.has(getItemKey(item))
 }
 
+if (palette) {
+  palette.register({
+    id: 'clipboard.list.refresh',
+    group: '列表',
+    title: '刷新历史',
+    description: () => props.isLoading ? '正在刷新…' : '重新拉取剪贴板记录',
+    icon: 'i-carbon-renew',
+    enabled: () => !props.isLoading,
+    action: handleRefresh,
+  })
+
+  palette.register({
+    id: 'clipboard.list.filter',
+    group: '列表',
+    title: () => (filterState.isPanelOpen.value ? '关闭筛选' : '打开筛选'),
+    description: () => `当前：${activeFilterLabel.value}`,
+    icon: 'i-carbon-filter',
+    action: toggleFilterPanel,
+  })
+
+  palette.register({
+    id: 'clipboard.list.multi-select',
+    group: '列表',
+    title: () => (props.multiSelectMode ? '退出多选' : '进入多选'),
+    description: () => {
+      if (!props.multiSelectMode)
+        return hasItems.value ? '选择多个条目后批量操作' : '暂无内容'
+      return props.multiSelectedCount ? `已选择 ${props.multiSelectedCount} 项` : '已开启多选'
+    },
+    icon: () => (props.multiSelectMode ? 'i-carbon-checkbox-checked-filled' : 'i-carbon-checkbox-multiple'),
+    enabled: () => hasItems.value || props.multiSelectMode,
+    action: handleToggleMultiSelectMode,
+  })
+
+  palette.register({
+    id: 'clipboard.list.bulk-delete',
+    group: '多选',
+    title: () => (props.bulkDeletePending ? '删除所选（处理中…）' : '删除所选'),
+    description: () => `已选择 ${props.multiSelectedCount} 项`,
+    icon: 'i-carbon-trash-can',
+    danger: true,
+    enabled: () => props.multiSelectMode && props.multiSelectedCount > 0 && !props.bulkDeletePending,
+    action: handleBulkDeleteSelected,
+  })
+
+  palette.register({
+    id: 'clipboard.list.bulk-favorite',
+    group: '多选',
+    title: () => (props.bulkFavoritePending ? '批量收藏（处理中…）' : '批量收藏'),
+    description: () => `已选择 ${props.multiSelectedCount} 项`,
+    icon: 'i-carbon-star',
+    enabled: () => props.multiSelectMode && props.multiSelectedCount > 0 && !props.bulkFavoritePending,
+    action: handleBulkFavoriteSelected,
+  })
+}
+
 watch(() => filterState.selectedFilter.value, () => {
   shouldDisableLoadMore.value = false
   pendingFilteredLoad.value = false
@@ -303,34 +362,13 @@ const canDisplayLoadMore = computed(() => props.canLoadMore && !shouldDisableLoa
             :has-items="hasItems"
             :multi-select-mode="multiSelectMode"
             :multi-selected-count="multiSelectedCount"
+            :show-refresh="false"
+            :show-multi-select-toggle="false"
+            :show-command-palette-trigger="true"
             @toggle-filter="toggleFilterPanel"
             @refresh="handleRefresh"
             @toggle-multi-select="handleToggleMultiSelectMode"
           />
-
-          <div v-if="multiSelectMode" class="multi-select-toolbar">
-            <span class="toolbar-summary">已选择 {{ multiSelectedCount }} 项</span>
-            <div class="toolbar-actions">
-              <button
-                class="toolbar-button danger"
-                type="button"
-                :disabled="!multiSelectedCount || bulkDeletePending"
-                @click="handleBulkDeleteSelected"
-              >
-                <span class="i-carbon-trash-can" aria-hidden="true" />
-                {{ bulkDeletePending ? '删除中…' : '删除所选' }}
-              </button>
-              <button
-                class="toolbar-button"
-                type="button"
-                :disabled="!multiSelectedCount || bulkFavoritePending"
-                @click="handleBulkFavoriteSelected"
-              >
-                <span class="i-carbon-star" aria-hidden="true" />
-                {{ bulkFavoritePending ? '处理中…' : '批量收藏' }}
-              </button>
-            </div>
-          </div>
         </div>
       </div>
     </Teleport>
@@ -345,34 +383,13 @@ const canDisplayLoadMore = computed(() => props.canLoadMore && !shouldDisableLoa
           :has-items="hasItems"
           :multi-select-mode="multiSelectMode"
           :multi-selected-count="multiSelectedCount"
+          :show-refresh="false"
+          :show-multi-select-toggle="false"
+          :show-command-palette-trigger="true"
           @toggle-filter="toggleFilterPanel"
           @refresh="handleRefresh"
           @toggle-multi-select="handleToggleMultiSelectMode"
         />
-
-        <div v-if="multiSelectMode" class="multi-select-toolbar">
-          <span class="toolbar-summary">已选择 {{ multiSelectedCount }} 项</span>
-          <div class="toolbar-actions">
-            <button
-              class="toolbar-button danger"
-              type="button"
-              :disabled="!multiSelectedCount || bulkDeletePending"
-              @click="handleBulkDeleteSelected"
-            >
-              <span class="i-carbon-trash-can" aria-hidden="true" />
-              {{ bulkDeletePending ? '删除中…' : '删除所选' }}
-            </button>
-            <button
-              class="toolbar-button"
-              type="button"
-              :disabled="!multiSelectedCount || bulkFavoritePending"
-              @click="handleBulkFavoriteSelected"
-            >
-              <span class="i-carbon-star" aria-hidden="true" />
-              {{ bulkFavoritePending ? '处理中…' : '批量收藏' }}
-            </button>
-          </div>
-        </div>
       </div>
     </div>
 
@@ -409,65 +426,5 @@ const canDisplayLoadMore = computed(() => props.canLoadMore && !shouldDisableLoa
   width: 100%;
   min-width: 0;
   white-space: nowrap;
-}
-
-.multi-select-toolbar {
-  display: inline-flex;
-  align-items: center;
-  gap: 10px;
-  padding: 6px 10px;
-  border-radius: 14px;
-  border: 1px solid var(--clipboard-border-color);
-  background: var(--clipboard-surface-strong);
-  color: var(--clipboard-text-secondary);
-}
-
-.multi-select-toolbar .toolbar-summary {
-  font-size: 0.85rem;
-  font-weight: 600;
-  color: var(--clipboard-text-secondary);
-}
-
-.multi-select-toolbar .toolbar-actions {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.multi-select-toolbar .toolbar-button {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 12px;
-  border-radius: 999px;
-  border: 1px solid var(--clipboard-border-color);
-  background: var(--clipboard-surface-base);
-  color: var(--clipboard-text-secondary);
-  font-size: 0.82rem;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.18s ease;
-}
-
-.multi-select-toolbar .toolbar-button:hover:not(:disabled) {
-  border-color: var(--clipboard-color-accent, #6366f1);
-  color: var(--clipboard-color-accent-strong, var(--clipboard-color-accent, #6366f1));
-  background: color-mix(in srgb, var(--clipboard-color-accent, #6366f1) 12%, transparent);
-}
-
-.multi-select-toolbar .toolbar-button.danger {
-  color: var(--clipboard-color-danger, #ef4444);
-  border-color: color-mix(in srgb, var(--clipboard-color-danger, #ef4444) 36%, transparent);
-}
-
-.multi-select-toolbar .toolbar-button.danger:hover:not(:disabled) {
-  background: color-mix(in srgb, var(--clipboard-color-danger, #ef4444) 12%, transparent);
-  border-color: var(--clipboard-color-danger, #ef4444);
-  color: var(--clipboard-color-danger, #ef4444);
-}
-
-.multi-select-toolbar .toolbar-button:disabled {
-  cursor: not-allowed;
-  opacity: 0.6;
 }
 </style>

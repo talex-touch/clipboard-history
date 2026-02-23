@@ -1,6 +1,10 @@
-import type { PluginClipboardItem } from '@talex-touch/utils'
-import { onCoreBoxInputChange, useBox } from '@talex-touch/utils'
-import { useClipboardHistory } from '@talex-touch/utils/plugin/sdk'
+import type { PluginClipboardItem } from '@talex-touch/utils/plugin/sdk/types'
+import {
+  ClipboardTypePresets,
+  onCoreBoxInputChange,
+  useBox,
+  useClipboard,
+} from '@talex-touch/utils/plugin/sdk'
 import structuredClonePolyfill from '@ungap/structured-clone'
 import { useEventListener } from '@vueuse/core'
 import {
@@ -15,10 +19,8 @@ import { toast } from 'vue-sonner'
 import { ensureTFileUrl } from '~/utils/tfile'
 import { formatTimestamp, getItemKey } from './clipboardUtils'
 
-type ClipboardHistoryClient = ReturnType<typeof useClipboardHistory> & {
-  applyToActiveApp?: (options: { item?: PluginClipboardItem }) => Promise<boolean>
-  copyAndPaste?: (options: { text?: string, html?: string, image?: Blob }) => Promise<boolean>
-}
+type ClipboardClient = ReturnType<typeof useClipboard>
+type ClipboardHistoryClient = ClipboardClient['history']
 
 interface LoadHistoryOptions {
   reset?: boolean
@@ -60,9 +62,8 @@ function formatError(error: unknown) {
 }
 
 export function useClipboardManager() {
-  const clipboard: ClipboardHistoryClient = import.meta.env.SSR
-    ? {} as ClipboardHistoryClient
-    : (useClipboardHistory() as ClipboardHistoryClient)
+  const clipboard = import.meta.env.SSR ? null : useClipboard()
+  const clipboardHistory = (clipboard?.history ?? {}) as ClipboardHistoryClient
   const box = useBox()
 
   const state = reactive({
@@ -120,30 +121,36 @@ export function useClipboardManager() {
       : -1
   })
 
-  function resolvePluginChannel() {
-    if (typeof window === 'undefined')
-      return null
-    const channel = (window as any)?.$channel
-    if (channel && typeof channel.send === 'function')
-      return channel
-    return null
-  }
-
   function cloneClipboardItem(item: PluginClipboardItem): PluginClipboardItem {
     const rawItem = toRaw(item)
     return structuredClonePolyfill(rawItem)
   }
 
-  async function hideCoreBoxWindow() {
+  function hideCoreBoxWindow() {
     try {
-      const channel = resolvePluginChannel()
-      if (!channel)
-        return
-      await channel.send('hide')
+      box.hide()
     }
     catch (error) {
       console.error('[ClipboardManager] Failed to hide CoreBox', error)
     }
+  }
+
+  async function resolveImageSource(item: PluginClipboardItem): Promise<string> {
+    if (item.id != null && clipboard?.getHistoryImageUrl) {
+      const url = await clipboard.getHistoryImageUrl(Number(item.id))
+      if (url)
+        return url
+    }
+
+    const meta = item.meta && typeof item.meta === 'object' ? item.meta : null
+    const metaUrl = meta && 'image_original_url' in meta ? (meta as Record<string, unknown>).image_original_url : null
+    if (typeof metaUrl === 'string' && metaUrl.trim())
+      return metaUrl.trim()
+
+    const content = (item.content ?? '').trim()
+    if (!content)
+      return ''
+    return content.startsWith('data:') ? content : ensureTFileUrl(content)
   }
 
   async function resolveImageBlob(item: PluginClipboardItem): Promise<Blob> {
@@ -209,6 +216,39 @@ export function useClipboardManager() {
   }
 
   async function writeClipboardFromItem(item: PluginClipboardItem): Promise<void> {
+    if (clipboard?.write) {
+      if (item.type === 'image') {
+        const imageSource = await resolveImageSource(item)
+        if (!imageSource)
+          throw new Error('无法解析图片内容')
+        await clipboard.write({ image: imageSource })
+        return
+      }
+
+      if (item.type === 'text') {
+        if (item.rawContent && typeof item.rawContent === 'string') {
+          await clipboard.write({
+            text: item.content ?? '',
+            html: item.rawContent,
+          })
+          return
+        }
+        await clipboard.write({ text: item.content ?? '' })
+        return
+      }
+
+      if (item.type === 'files') {
+        const files = parseFileListFromItem(item)
+        if (files.length) {
+          await clipboard.write({ files })
+          return
+        }
+      }
+
+      await clipboard.write({ text: item.content ?? '' })
+      return
+    }
+
     if (typeof navigator === 'undefined' || !navigator.clipboard)
       throw new Error('当前环境暂不支持直接写入系统剪贴板')
 
@@ -397,8 +437,8 @@ export function useClipboardManager() {
 
     try {
       const input = await box.getInput()
-      const payload = await clipboard.getHistory({ page: targetPage, keyword: input })
-      const history = payload.history ?? []
+      const payload = await clipboardHistory.getHistory({ page: targetPage, keyword: input })
+      const historyItems = payload.history ?? []
       const previousLength = reset ? 0 : state.clipboardItems.length
       const resolvedPage = typeof payload.page === 'number' ? payload.page : targetPage
       const resolvedPageSize = typeof payload.pageSize === 'number' ? payload.pageSize : state.pageSize
@@ -407,21 +447,21 @@ export function useClipboardManager() {
       state.total = payload.total
       state.pageSize = resolvedPageSize
 
-      state.clipboardItems = reset ? history : mergeHistory(state.clipboardItems, history)
+      state.clipboardItems = reset ? historyItems : mergeHistory(state.clipboardItems, historyItems)
       const nextLength = state.clipboardItems.length
 
       if (reset) {
         const hasMore
           = resolvedPageSize > 0
-            ? history.length >= resolvedPageSize
-            : history.length > 0
+            ? historyItems.length >= resolvedPageSize
+            : historyItems.length > 0
         state.hasReachedHistoryEnd = !hasMore
       }
       else {
         const reachedEnd
-          = history.length === 0
+          = historyItems.length === 0
             || resolvedPage < targetPage
-            || (resolvedPageSize > 0 && history.length < resolvedPageSize)
+            || (resolvedPageSize > 0 && historyItems.length < resolvedPageSize)
             || nextLength === previousLength
 
         state.hasReachedHistoryEnd = !!reachedEnd
@@ -460,20 +500,30 @@ export function useClipboardManager() {
       const payload = cloneClipboardItem(item)
 
       // 优先使用新的 copyAndPaste API
-      if (typeof clipboard.copyAndPaste === 'function') {
+      if (clipboard?.copyAndPaste) {
         let success = false
         if (item.type === 'image') {
-          const blob = await resolveImageBlob(item)
-          success = await clipboard.copyAndPaste({ image: blob })
+          const imageSource = await resolveImageSource(item)
+          if (!imageSource)
+            throw new Error('无法解析图片内容')
+          success = await clipboard.copyAndPaste({ image: imageSource, hideCoreBox: true })
         }
         else if (item.type === 'text' && item.rawContent) {
           success = await clipboard.copyAndPaste({
             text: item.content ?? '',
             html: item.rawContent,
+            hideCoreBox: true,
           })
         }
+        else if (item.type === 'files') {
+          const files = parseFileListFromItem(item)
+          if (files.length)
+            success = await clipboard.copyAndPaste({ files, hideCoreBox: true })
+          else
+            success = await clipboard.copyAndPaste({ text: item.content ?? '', hideCoreBox: true })
+        }
         else {
-          success = await clipboard.copyAndPaste({ text: item.content ?? '' })
+          success = await clipboard.copyAndPaste({ text: item.content ?? '', hideCoreBox: true })
         }
         if (!success)
           throw new Error('自动粘贴失败')
@@ -482,8 +532,8 @@ export function useClipboardManager() {
       }
 
       // 回退到旧的 applyToActiveApp API
-      if (typeof clipboard.applyToActiveApp === 'function') {
-        const success = await clipboard.applyToActiveApp({
+      if (clipboardHistory.applyToActiveApp) {
+        const success = await clipboardHistory.applyToActiveApp({
           item: payload,
           hideCoreBox: true,
         })
@@ -492,21 +542,7 @@ export function useClipboardManager() {
         toast.success('已粘贴到当前应用')
         return true
       }
-
-      // 最后回退到 channel
-      const channel = resolvePluginChannel()
-      if (!channel)
-        throw new Error('无法调用自动粘贴通道')
-
-      const response = await channel.send('clipboard:apply-to-active-app', {
-        item: payload,
-        hideCoreBox: true,
-      })
-      if (response && typeof response === 'object' && 'success' in response && !response.success)
-        throw new Error((response as { message?: string }).message ?? '自动粘贴失败')
-
-      toast.success('已粘贴到当前应用')
-      return true
+      throw new Error('无法调用自动粘贴通道')
     }
     catch (error) {
       console.error('[ClipboardManager] Failed to auto apply clipboard item', {
@@ -556,7 +592,7 @@ export function useClipboardManager() {
     const nextState = !state.selectedItem.isFavorite
 
     try {
-      await clipboard.setFavorite({
+      await clipboardHistory.setFavorite({
         id: Number(state.selectedItem.id),
         isFavorite: nextState,
       })
@@ -589,7 +625,7 @@ export function useClipboardManager() {
     const key = getItemKey(state.selectedItem)
 
     try {
-      await clipboard.deleteItem({ id: Number(state.selectedItem.id) })
+      await clipboardHistory.deleteItem({ id: Number(state.selectedItem.id) })
 
       state.clipboardItems = state.clipboardItems.filter((item: any) => getItemKey(item) !== key)
       state.total = Math.max(0, state.total - 1)
@@ -611,7 +647,7 @@ export function useClipboardManager() {
     state.isClearing = true
     state.errorMessage = null
     try {
-      await clipboard.clearHistory()
+      await clipboardHistory.clearHistory()
       state.clipboardItems = []
       state.total = 0
       ensureSelection()
@@ -640,7 +676,7 @@ export function useClipboardManager() {
 
     try {
       for (const item of itemsToDelete)
-        await clipboard.deleteItem({ id: Number(item.id) })
+        await clipboardHistory.deleteItem({ id: Number(item.id) })
 
       state.clipboardItems = state.clipboardItems.filter((item: any) => !targetKeys.has(getItemKey(item)))
       const deletedCount = itemsToDelete.length
@@ -674,7 +710,7 @@ export function useClipboardManager() {
 
     try {
       for (const item of itemsToFavorite)
-        await clipboard.setFavorite({ id: Number(item.id), isFavorite: true })
+        await clipboardHistory.setFavorite({ id: Number(item.id), isFavorite: true })
 
       state.clipboardItems = state.clipboardItems.map((item: any) => {
         if (!targetKeys.has(getItemKey(item)))
@@ -718,7 +754,8 @@ export function useClipboardManager() {
       box.clearInput()
       box.allowInput()
       await loadHistory({ reset: true, showInitialSpinner: true })
-      stopClipboardListener = clipboard.onDidChange(handleClipboardChange)
+      await box.allowClipboard(ClipboardTypePresets.ALL)
+      stopClipboardListener = clipboardHistory.onDidChange(handleClipboardChange)
     }
     catch (error) {
       state.errorMessage = formatError(error)

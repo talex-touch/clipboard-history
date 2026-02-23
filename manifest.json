@@ -1,8 +1,9 @@
 {
   "id": "com.tuffex.clipboard-history",
   "name": "clipboard-history",
-  "version": "1.0.0",
-  "sdkapi": 251212,
+  "version": "1.1.0",
+  "sdkapi": 260215,
+  "category": "utilities",
   "icon": {
     "type": "file",
     "value": "assets/logo.svg"
@@ -17,7 +18,7 @@
   },
   "dev": {
     "enable": true,
-    "address": "http://localhost:3488/#/",
+    "address": "http://127.0.0.1:3488/",
     "source": true
   },
   "features": [
