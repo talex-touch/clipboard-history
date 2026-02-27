@@ -2,6 +2,7 @@ import type { PluginClipboardItem } from '@talex-touch/utils/plugin/sdk/types'
 import {
   ClipboardTypePresets,
   onCoreBoxInputChange,
+  onCoreBoxKeyEvent,
   useBox,
   useClipboard,
 } from '@talex-touch/utils/plugin/sdk'
@@ -26,6 +27,22 @@ interface LoadHistoryOptions {
   reset?: boolean
   showInitialSpinner?: boolean
   ensureSelectionVisible?: boolean
+  keyword?: string
+}
+
+interface HotkeyEventLike {
+  key: string
+  metaKey: boolean
+  ctrlKey: boolean
+  altKey: boolean
+  shiftKey: boolean
+  target?: EventTarget | null
+  preventDefault?: () => void
+}
+
+interface ForwardedHotkeyCache {
+  signature: string
+  at: number
 }
 
 function escapeSelector(value: string) {
@@ -61,6 +78,69 @@ function formatError(error: unknown) {
   }
 }
 
+function resolveCoreBoxInputKeyword(payload: unknown): string {
+  if (!payload || typeof payload !== 'object')
+    return ''
+
+  const root = payload as Record<string, unknown>
+  const source = (root.data && typeof root.data === 'object'
+    ? root.data
+    : root) as Record<string, unknown>
+
+  if (typeof source.input === 'string')
+    return source.input
+
+  const query = source.query
+  if (query && typeof query === 'object') {
+    const text = (query as Record<string, unknown>).text
+    if (typeof text === 'string')
+      return text
+  }
+
+  return ''
+}
+
+function resolveCoreBoxForwardedKey(payload: unknown): HotkeyEventLike | null {
+  if (!payload || typeof payload !== 'object')
+    return null
+
+  const root = payload as Record<string, unknown>
+  const source = (root.data && typeof root.data === 'object'
+    ? root.data
+    : root) as Record<string, unknown>
+
+  const key = source.key
+  if (typeof key !== 'string' || !key.trim())
+    return null
+
+  return {
+    key,
+    metaKey: Boolean(source.metaKey),
+    ctrlKey: Boolean(source.ctrlKey),
+    altKey: Boolean(source.altKey),
+    shiftKey: Boolean(source.shiftKey),
+  }
+}
+
+function getImageOriginalUrl(item: PluginClipboardItem | null): string {
+  if (!item || !item.meta || typeof item.meta !== 'object')
+    return ''
+
+  const raw = (item.meta as Record<string, unknown>).image_original_url
+  if (typeof raw === 'string' && raw.trim())
+    return raw.trim()
+
+  return ''
+}
+
+function shouldIgnoreForwardedEditingShortcut(event: HotkeyEventLike): boolean {
+  if (!(event.metaKey || event.ctrlKey))
+    return false
+
+  const key = event.key.toLowerCase()
+  return ['a', 'c', 'v', 'x', 'z', 'y'].includes(key)
+}
+
 export function useClipboardManager() {
   const clipboard = import.meta.env.SSR ? null : useClipboard()
   const clipboardHistory = (clipboard?.history ?? {}) as ClipboardHistoryClient
@@ -76,7 +156,6 @@ export function useClipboardManager() {
     favoritePending: false,
     deletePending: false,
     applyPending: false,
-    copyPending: false,
     bulkDeletePending: false,
     bulkFavoritePending: false,
     errorMessage: null as string | null,
@@ -90,6 +169,7 @@ export function useClipboardManager() {
     multiSelectedItems: [] as PluginClipboardItem[],
     canLoadMore: false,
     activeIndex: -1,
+    queryKeyword: '',
   })
 
   if (!import.meta.env.SSR) {
@@ -102,6 +182,8 @@ export function useClipboardManager() {
 
   let stopClipboardListener: (() => void) | null = null
   let stopHotkeys: (() => void) | undefined
+  let activeHistoryRequestId = 0
+  let lastForwardedHotkey: ForwardedHotkeyCache | null = null
 
   watchEffect(() => {
     state.canLoadMore = !state.hasReachedHistoryEnd && state.clipboardItems.length < state.total
@@ -153,16 +235,49 @@ export function useClipboardManager() {
     return content.startsWith('data:') ? content : ensureTFileUrl(content)
   }
 
-  async function resolveImageBlob(item: PluginClipboardItem): Promise<Blob> {
-    const content = (item.content ?? '').trim()
-    if (!content)
-      throw new Error('无法解析图片内容')
+  function patchItemMeta(itemKey: string, patch: Record<string, unknown>) {
+    const targetIndex = state.clipboardItems.findIndex((entry: any) => getItemKey(entry) === itemKey)
+    if (targetIndex === -1)
+      return
 
-    const source = content.startsWith('data:') ? content : ensureTFileUrl(content)
-    const response = await fetch(source)
-    if (!response.ok)
-      throw new Error(`无法读取图片数据（${response.status}）`)
-    return await response.blob()
+    const target = state.clipboardItems[targetIndex]
+    const baseMeta = target.meta && typeof target.meta === 'object' ? target.meta : {}
+    const nextMeta = { ...(baseMeta as Record<string, unknown>), ...patch }
+    state.clipboardItems.splice(targetIndex, 1, {
+      ...target,
+      meta: nextMeta,
+    })
+
+    if (state.selectedKey === itemKey && state.selectedItem) {
+      const selectedBaseMeta = state.selectedItem.meta && typeof state.selectedItem.meta === 'object'
+        ? state.selectedItem.meta
+        : {}
+      state.selectedItem = {
+        ...state.selectedItem,
+        meta: { ...(selectedBaseMeta as Record<string, unknown>), ...patch },
+      }
+    }
+  }
+
+  async function ensureImageOriginalUrl(item: PluginClipboardItem) {
+    if (item.type !== 'image' || item.id == null)
+      return
+
+    if (getImageOriginalUrl(item))
+      return
+
+    if (!clipboard?.getHistoryImageUrl)
+      return
+
+    try {
+      const url = await clipboard.getHistoryImageUrl(Number(item.id))
+      if (!url)
+        return
+      patchItemMeta(getItemKey(item), { image_original_url: url })
+    }
+    catch {
+      // ignore image url resolve errors
+    }
   }
 
   function clearMultiSelection() {
@@ -215,76 +330,6 @@ export function useClipboardManager() {
     return item.content.split(/\r?\n|;+/).map((entry: any) => entry.trim()).filter(Boolean)
   }
 
-  async function writeClipboardFromItem(item: PluginClipboardItem): Promise<void> {
-    if (clipboard?.write) {
-      if (item.type === 'image') {
-        const imageSource = await resolveImageSource(item)
-        if (!imageSource)
-          throw new Error('无法解析图片内容')
-        await clipboard.write({ image: imageSource })
-        return
-      }
-
-      if (item.type === 'text') {
-        if (item.rawContent && typeof item.rawContent === 'string') {
-          await clipboard.write({
-            text: item.content ?? '',
-            html: item.rawContent,
-          })
-          return
-        }
-        await clipboard.write({ text: item.content ?? '' })
-        return
-      }
-
-      if (item.type === 'files') {
-        const files = parseFileListFromItem(item)
-        if (files.length) {
-          await clipboard.write({ files })
-          return
-        }
-      }
-
-      await clipboard.write({ text: item.content ?? '' })
-      return
-    }
-
-    if (typeof navigator === 'undefined' || !navigator.clipboard)
-      throw new Error('当前环境暂不支持直接写入系统剪贴板')
-
-    if (item.type === 'image') {
-      if (typeof ClipboardItem === 'undefined')
-        throw new Error('当前浏览器不支持写入图片到剪贴板')
-
-      const blob = await resolveImageBlob(item)
-      const clipboardItem = new ClipboardItem({ [blob.type || 'image/png']: blob })
-      await navigator.clipboard.write([clipboardItem])
-      return
-    }
-
-    if (item.type === 'text') {
-      if (item.rawContent && typeof item.rawContent === 'string' && typeof ClipboardItem !== 'undefined') {
-        const textBlob = new Blob([item.content ?? ''], { type: 'text/plain' })
-        const htmlBlob = new Blob([item.rawContent], { type: 'text/html' })
-        const clipboardItem = new ClipboardItem({ 'text/html': htmlBlob, 'text/plain': textBlob })
-        await navigator.clipboard.write([clipboardItem])
-        return
-      }
-      await navigator.clipboard.writeText(item.content ?? '')
-      return
-    }
-
-    if (item.type === 'files') {
-      const files = parseFileListFromItem(item)
-      if (files.length) {
-        await navigator.clipboard.writeText(files.join('\n'))
-        return
-      }
-    }
-
-    await navigator.clipboard.writeText(item.content ?? '')
-  }
-
   function ensureItemVisible(key: string) {
     if (typeof document === 'undefined')
       return
@@ -299,6 +344,7 @@ export function useClipboardManager() {
     state.selectedItem = item
     state.selectedKey = key
     nextTick(() => ensureItemVisible(key))
+    void ensureImageOriginalUrl(item)
   }
 
   function ensureSelection(preferredKey?: string) {
@@ -338,31 +384,58 @@ export function useClipboardManager() {
       setSelection(nextItem)
   }
 
-  function handleArrowNavigation(event: KeyboardEvent) {
+  function preventHotkeyDefault(event: HotkeyEventLike) {
+    event.preventDefault?.()
+  }
+
+  function getHotkeySignature(event: HotkeyEventLike): string {
+    return `${event.key}|${event.metaKey ? 1 : 0}|${event.ctrlKey ? 1 : 0}|${event.altKey ? 1 : 0}|${event.shiftKey ? 1 : 0}`
+  }
+
+  function markForwardedHotkey(event: HotkeyEventLike) {
+    lastForwardedHotkey = {
+      signature: getHotkeySignature(event),
+      at: Date.now(),
+    }
+  }
+
+  function shouldSkipDomHotkey(event: KeyboardEvent): boolean {
+    if (!lastForwardedHotkey)
+      return false
+
+    const dedupeWindowMs = 160
+    const now = Date.now()
+    if (now - lastForwardedHotkey.at > dedupeWindowMs)
+      return false
+
+    return getHotkeySignature(event) === lastForwardedHotkey.signature
+  }
+
+  function handleArrowNavigation(event: HotkeyEventLike) {
     if (!state.clipboardItems.length)
       return
 
     if (event.key === 'ArrowDown') {
-      event.preventDefault()
+      preventHotkeyDefault(event)
       // Allow wrap from last to first when pressing down
       selectByIndex((state.activeIndex === -1 ? 0 : state.activeIndex) + 1, true)
     }
     else if (event.key === 'ArrowUp') {
-      event.preventDefault()
+      preventHotkeyDefault(event)
       // Do NOT allow wrap from first to last when pressing up
       selectByIndex((state.activeIndex === -1 ? 0 : state.activeIndex) - 1, false)
     }
     else if (event.key === 'Home') {
-      event.preventDefault()
+      preventHotkeyDefault(event)
       selectByIndex(0, false)
     }
     else if (event.key === 'End') {
-      event.preventDefault()
+      preventHotkeyDefault(event)
       selectByIndex(state.clipboardItems.length - 1, false)
     }
   }
 
-  function handleQuickSelect(event: KeyboardEvent) {
+  function handleQuickSelect(event: HotkeyEventLike) {
     if (!state.clipboardItems.length)
       return
 
@@ -378,31 +451,22 @@ export function useClipboardManager() {
       selectByIndex(index)
   }
 
-  async function handleHotkeys(event: KeyboardEvent) {
-    const target = event.target as HTMLElement | null
+  async function handleHotkeys(event: HotkeyEventLike) {
+    const target = event.target instanceof HTMLElement ? event.target : null
     if (target?.tagName === 'INPUT' || target?.tagName === 'TEXTAREA' || target?.isContentEditable)
       return
 
     if ((event.metaKey || event.ctrlKey) && !event.shiftKey && !event.altKey && (event.key === 's' || event.key === 'S')) {
-      event.preventDefault()
+      preventHotkeyDefault(event)
       await toggleFavorite()
       return
     }
 
-    if (event.key === 'Enter') {
-      event.preventDefault()
-      if (event.metaKey || event.ctrlKey) {
-        // ⌘+Enter -> 复制到剪贴板
-        const copied = await copyItem()
-        if (copied)
-          await hideCoreBoxWindow()
-      }
-      else {
-        // Enter -> 粘贴到当前应用
-        const applied = await applyItem()
-        if (applied)
-          await hideCoreBoxWindow()
-      }
+    if (event.key === 'Enter' && !event.shiftKey && !event.altKey) {
+      preventHotkeyDefault(event)
+      const applied = await applyItem()
+      if (applied)
+        await hideCoreBoxWindow()
       return
     }
 
@@ -415,7 +479,10 @@ export function useClipboardManager() {
       reset = false,
       showInitialSpinner = false,
       ensureSelectionVisible = true,
+      keyword,
     } = options
+    const requestId = ++activeHistoryRequestId
+    const nextKeyword = typeof keyword === 'string' ? keyword : state.queryKeyword
 
     if (showInitialSpinner || reset)
       state.errorMessage = null
@@ -436,8 +503,9 @@ export function useClipboardManager() {
       state.isLoadingMore = true
 
     try {
-      const input = await box.getInput()
-      const payload = await clipboardHistory.getHistory({ page: targetPage, keyword: input })
+      const payload = await clipboardHistory.getHistory({ page: targetPage, keyword: nextKeyword })
+      if (requestId !== activeHistoryRequestId)
+        return
       const historyItems = payload.history ?? []
       const previousLength = reset ? 0 : state.clipboardItems.length
       const resolvedPage = typeof payload.page === 'number' ? payload.page : targetPage
@@ -471,13 +539,17 @@ export function useClipboardManager() {
         ensureSelection()
     }
     catch (error) {
+      if (requestId !== activeHistoryRequestId)
+        return
       state.errorMessage = formatError(error)
     }
     finally {
-      if (showInitialSpinner)
-        state.isLoading = false
-      if (!showInitialSpinner && !reset)
-        state.isLoadingMore = false
+      if (requestId === activeHistoryRequestId) {
+        if (showInitialSpinner)
+          state.isLoading = false
+        if (!showInitialSpinner && !reset)
+          state.isLoadingMore = false
+      }
     }
   }
 
@@ -554,32 +626,6 @@ export function useClipboardManager() {
     }
     finally {
       state.applyPending = false
-    }
-  }
-
-  async function copyItem(item: PluginClipboardItem | null = state.selectedItem): Promise<boolean> {
-    if (!item || state.copyPending)
-      return false
-
-    state.copyPending = true
-    state.errorMessage = null
-
-    try {
-      const payload = cloneClipboardItem(item)
-      await writeClipboardFromItem(payload)
-      toast.success('已复制到剪贴板')
-      return true
-    }
-    catch (error) {
-      console.error('[ClipboardManager] Failed to copy clipboard item', {
-        item,
-        error,
-      })
-      state.errorMessage = formatError(error)
-      return false
-    }
-    finally {
-      state.copyPending = false
     }
   }
 
@@ -751,8 +797,13 @@ export function useClipboardManager() {
   async function bootstrap() {
     state.errorMessage = null
     try {
-      box.clearInput()
-      box.allowInput()
+      await box.allowInput()
+      try {
+        state.queryKeyword = await box.getInput()
+      }
+      catch {
+        state.queryKeyword = ''
+      }
       await loadHistory({ reset: true, showInitialSpinner: true })
       await box.allowClipboard(ClipboardTypePresets.ALL)
       stopClipboardListener = clipboardHistory.onDidChange(handleClipboardChange)
@@ -765,8 +816,22 @@ export function useClipboardManager() {
     }
   }
 
-  onCoreBoxInputChange(async () => {
+  onCoreBoxInputChange(async (payload) => {
+    const nextKeyword = resolveCoreBoxInputKeyword(payload)
+    if (nextKeyword === state.queryKeyword)
+      return
+    state.queryKeyword = nextKeyword
     await loadHistory({ reset: true, showInitialSpinner: true })
+  })
+
+  onCoreBoxKeyEvent((payload) => {
+    const forwarded = resolveCoreBoxForwardedKey(payload)
+    if (!forwarded)
+      return
+    if (shouldIgnoreForwardedEditingShortcut(forwarded))
+      return
+    markForwardedHotkey(forwarded)
+    void handleHotkeys(forwarded)
   })
 
   // 直接注册事件监听器，因为这个 composable 可能在 onMounted 回调中被调用
@@ -775,7 +840,11 @@ export function useClipboardManager() {
     // 立即启动 bootstrap
     bootstrap()
     // 注册键盘事件监听器
-    stopHotkeys = useEventListener(document, 'keydown', handleHotkeys)
+    stopHotkeys = useEventListener(document, 'keydown', (event) => {
+      if (shouldSkipDomHotkey(event))
+        return
+      void handleHotkeys(event)
+    })
   }
 
   onBeforeUnmount(() => {
@@ -797,7 +866,6 @@ export function useClipboardManager() {
     bulkDeleteSelected,
     bulkFavoriteSelected,
     applyItem,
-    copyItem,
     loadHistory,
     formatTimestamp,
   })
