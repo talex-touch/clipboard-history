@@ -66,11 +66,9 @@ onMounted(async () => {
           <ClipboardActionBar
             class="footer-right"
             :item="manager.selectedItem"
-            :copy-pending="manager.copyPending"
             :apply-pending="manager.applyPending"
             :favorite-pending="manager.favoritePending"
             :delete-pending="manager.deletePending"
-            @copy="manager.copyItem()"
             @apply="manager.applyItem()"
             @toggle-favorite="manager.toggleFavorite()"
             @delete="manager.deleteSelected()"

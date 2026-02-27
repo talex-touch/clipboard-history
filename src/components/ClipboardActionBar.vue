@@ -6,14 +6,12 @@ import { useCommandPalette } from '~/composables/useCommandPalette'
 
 const props = defineProps<{
   item: PluginClipboardItem | null
-  copyPending: boolean
   applyPending: boolean
   favoritePending: boolean
   deletePending: boolean
 }>()
 
 const emit = defineEmits<{
-  (event: 'copy'): void
   (event: 'apply'): void
   (event: 'toggleFavorite'): void
   (event: 'delete'): void
@@ -22,7 +20,6 @@ const emit = defineEmits<{
 const activeAppName = ref('当前应用')
 
 const pasteTargetName = computed(() => activeAppName.value.trim() || '当前应用')
-const copyButtonLabel = computed(() => (props.copyPending ? '复制中…' : '复制'))
 const pasteButtonLabel = computed(() => props.applyPending ? `粘贴到${pasteTargetName.value}中…` : `粘贴到${pasteTargetName.value}`)
 const favoriteButtonLabel = computed(() => {
   if (props.favoritePending)
@@ -36,10 +33,6 @@ const hasItem = computed(() => !!props.item)
 const hasPersistedItem = computed(() => !!props.item?.id)
 const palette = useCommandPalette()
 
-function handleCopy() {
-  emit('copy')
-}
-
 function handleApply() {
   emit('apply')
 }
@@ -52,22 +45,7 @@ function handleDelete() {
   emit('delete')
 }
 
-function handleOpenPalette() {
-  palette?.open()
-}
-
 if (palette) {
-  palette.register({
-    id: 'clipboard.item.copy',
-    group: '当前条目',
-    title: () => copyButtonLabel.value,
-    description: '复制到剪贴板',
-    icon: () => (props.copyPending ? 'i-carbon-time' : 'i-carbon-copy'),
-    shortcut: '⌘ Enter',
-    enabled: () => hasItem.value && !props.copyPending,
-    action: handleCopy,
-  })
-
   palette.register({
     id: 'clipboard.item.paste',
     group: '当前条目',
@@ -119,18 +97,6 @@ onMounted(async () => {
   <div class="clipboard-action-bar">
     <div class="footer-actions">
       <button
-        class="surface-button with-shortcut"
-        type="button"
-        :disabled="copyPending || !hasItem"
-        :title="copyButtonLabel"
-        :aria-label="copyButtonLabel"
-        @click="handleCopy"
-      >
-        <span class="button-icon" :class="copyPending ? 'i-carbon-time' : 'i-carbon-copy'" aria-hidden="true" />
-        <span class="button-text">{{ copyPending ? '复制中…' : '复制' }}</span>
-        <span class="button-shortcut">⌘ Enter</span>
-      </button>
-      <button
         class="surface-button primary with-shortcut"
         type="button"
         :disabled="applyPending || !hasItem"
@@ -139,17 +105,8 @@ onMounted(async () => {
         @click="handleApply"
       >
         <span class="button-icon" :class="applyPending ? 'i-carbon-time' : 'i-carbon-paste'" aria-hidden="true" />
-        <span class="button-text">{{ applyPending ? '粘贴中…' : '粘贴到当前应用' }}</span>
+        <span class="button-text">{{ applyPending ? '粘贴中…' : '回车粘贴到当前应用' }}</span>
         <span class="button-shortcut">Enter</span>
-      </button>
-      <button
-        class="surface-button icon-only"
-        type="button"
-        title="更多操作（⌘ K）"
-        aria-label="更多操作"
-        @click="handleOpenPalette"
-      >
-        <span class="button-icon i-carbon-command" aria-hidden="true" />
       </button>
     </div>
   </div>
@@ -206,18 +163,6 @@ onMounted(async () => {
   font-weight: 600;
 }
 
-.surface-button.icon-only {
-  width: 36px;
-  min-height: 36px;
-  padding: 0;
-  border-radius: 12px;
-  gap: 0;
-}
-
-.surface-button.icon-only .button-text {
-  display: none;
-}
-
 .surface-button.with-shortcut {
   flex-direction: row;
   align-items: center;
@@ -246,18 +191,6 @@ onMounted(async () => {
   box-shadow: 0 6px 18px rgba(15, 23, 42, 0.08);
 }
 
-.surface-button.danger {
-  border-color: color-mix(in srgb, var(--clipboard-color-danger, #ef4444) 40%, transparent);
-  background: color-mix(in srgb, var(--clipboard-color-danger, #ef4444) 10%, transparent);
-  color: var(--clipboard-color-danger, #ef4444);
-}
-
-.surface-button.danger:hover:not(:disabled) {
-  background: color-mix(in srgb, var(--clipboard-color-danger, #ef4444) 16%, transparent);
-  border-color: var(--clipboard-color-danger, #ef4444);
-  color: var(--clipboard-color-danger, #ef4444);
-}
-
 .surface-button.primary:hover:not(:disabled) {
   border-color: var(--clipboard-color-accent, #6366f1);
   color: var(--clipboard-color-accent-strong, var(--clipboard-color-accent, #6366f1));
@@ -266,15 +199,6 @@ onMounted(async () => {
 .surface-button:disabled {
   opacity: 0.55;
   cursor: not-allowed;
-}
-
-.surface-button.is-active {
-  border-color: color-mix(in srgb, var(--clipboard-color-accent, #6366f1) 70%, transparent);
-  color: var(--clipboard-color-accent-strong, var(--clipboard-color-accent, #6366f1));
-}
-
-.surface-button.is-active:hover:not(:disabled) {
-  border-color: var(--clipboard-color-accent, #6366f1);
 }
 
 @media (max-width: 720px) {
