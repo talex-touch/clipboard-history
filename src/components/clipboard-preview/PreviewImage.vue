@@ -16,29 +16,55 @@ const props = defineProps<{
 
 const hdLoaded = ref(false)
 const hdSrc = ref('')
+const loadRequestId = ref(0)
+
+function debugLog(stage: string, meta?: Record<string, unknown>) {
+  const ts = new Date().toISOString()
+  if (meta)
+    // eslint-disable-next-line no-console
+    console.debug(`[PreviewImage][${ts}] ${stage}`, meta)
+  else
+    // eslint-disable-next-line no-console
+    console.debug(`[PreviewImage][${ts}] ${stage}`)
+}
 
 // Watch for item changes to reset and trigger progressive loading
 watch(
-  () => props.src,
-  (newSrc) => {
+  () => [props.src, props.thumbnail] as const,
+  ([newSrc, newThumbnail]) => {
+    const requestId = ++loadRequestId.value
     hdLoaded.value = false
     hdSrc.value = ''
 
-    if (!newSrc || !props.thumbnail || newSrc === props.thumbnail) {
+    debugLog('load:start', {
+      requestId,
+      hasSrc: Boolean(newSrc),
+      hasThumbnail: Boolean(newThumbnail),
+      sameSource: newSrc === newThumbnail,
+    })
+
+    if (!newSrc || !newThumbnail || newSrc === newThumbnail) {
       // No progressive loading needed
       hdLoaded.value = true
+      debugLog('load:skip', { requestId })
       return
     }
 
     // Preload full resolution image
     const img = new Image()
     img.onload = () => {
+      if (requestId !== loadRequestId.value)
+        return
       hdSrc.value = newSrc
       hdLoaded.value = true
+      debugLog('load:success', { requestId, source: newSrc.slice(0, 96) })
     }
     img.onerror = () => {
+      if (requestId !== loadRequestId.value)
+        return
       // Fallback to thumbnail on error
       hdLoaded.value = true
+      debugLog('load:error', { requestId, source: newSrc.slice(0, 96) })
     }
     img.src = newSrc
   },

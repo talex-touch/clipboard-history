@@ -268,10 +268,21 @@ const fallbackFileDisplay = computed(() => {
 
 const previewText = computed(() => props.item?.content ?? '')
 
+function getImageOriginalUrl(item: PluginClipboardItem | null): string {
+  if (!item || !item.meta || typeof item.meta !== 'object')
+    return ''
+  const raw = (item.meta as Record<string, unknown>).image_original_url
+  if (typeof raw === 'string' && raw.trim())
+    return raw.trim()
+  return ''
+}
+
 // Thumbnail for fast initial display
 const thumbnailSrc = computed(() => {
   if (!props.item)
     return ''
+  if (primaryType.value === 'image')
+    return props.item.thumbnail || props.item.content || ''
   return props.item.thumbnail || ''
 })
 
@@ -281,7 +292,10 @@ const fullImageSrc = computed(() => {
     return ''
   const content = typeof props.item.content === 'string' ? props.item.content : ''
   if (primaryType.value === 'image') {
-    if (/^(?:data|https?|blob):/i.test(content))
+    const originalUrl = getImageOriginalUrl(props.item)
+    if (originalUrl)
+      return ensureTFileUrl(originalUrl)
+    if (/^(?:data|https?|blob|tfile):/i.test(content))
       return content
     return ensureTFileUrl(content)
   }
@@ -340,7 +354,7 @@ const isLinkType = computed(() =>
         <PreviewImage
           v-else-if="derivedType === 'data-url-image' || primaryType === 'image'"
           :thumbnail="thumbnailSrc"
-          :src="fullImageSrc || item.content"
+          :src="fullImageSrc || thumbnailSrc || item.content"
         />
         <PreviewFiles
           v-else-if="isFileType"

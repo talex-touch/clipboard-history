@@ -1,6 +1,6 @@
 {
   "type": "module",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "private": true,
   "packageManager": "pnpm@10.25.0",
   "scripts": {
@@ -18,7 +18,7 @@
     "sizecheck": "npx vite-bundle-visualizer"
   },
   "dependencies": {
-    "@talex-touch/utils": "catalog:conflicts_@talex-touch/utils_h1_0_35",
+    "@talex-touch/utils": "file:../talex-touch/packages/utils",
     "@unhead/vue": "catalog:frontend",
     "@unocss/reset": "catalog:frontend",
     "@vitejs/plugin-vue": "catalog:build",

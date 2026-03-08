@@ -1,7 +1,7 @@
 {
   "id": "com.tuffex.clipboard-history",
   "name": "clipboard-history",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "sdkapi": 260215,
   "category": "utilities",
   "icon": {
@@ -10,11 +10,12 @@
   },
   "description": "一款全平台剪贴板历史记录插件，从 tuff 核心提取剪贴板历史。",
   "permissions": {
-    "required": ["clipboard.read"],
+    "required": ["clipboard.read", "clipboard.write"],
     "optional": []
   },
   "permissionReasons": {
-    "clipboard.read": "读取剪贴板历史记录内容"
+    "clipboard.read": "读取剪贴板历史记录内容",
+    "clipboard.write": "应用历史记录、收藏与删除等写操作"
   },
   "dev": {
     "enable": true,

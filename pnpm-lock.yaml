@@ -162,8 +162,8 @@ importers:
   .:
     dependencies:
       '@talex-touch/utils':
-        specifier: 1.0.44
-        version: 1.0.44(electron@37.6.0)(vue@3.5.25(typescript@5.9.3))
+        specifier: file:../talex-touch/packages/utils
+        version: file:../talex-touch/packages/utils(electron@37.6.0)(vue@3.5.25(typescript@5.9.3))
       '@unhead/vue':
         specifier: catalog:frontend
         version: 2.0.19(vue@3.5.25(typescript@5.9.3))
@@ -1923,6 +1923,12 @@ packages:
 
   '@talex-touch/utils@1.0.44':
     resolution: {integrity: sha512-Pc3E+EiEIjSyiR/T0CQ5qkmPY+DrhEVzlGkT7vtKlPqmYaQDHkiDGdDRxh6p9DXeJ3QhwqioypUbqlB3QzE+vg==}
+    peerDependencies:
+      electron: ^40.0.0
+      vue: ^3.5.27
+
+  '@talex-touch/utils@file:../talex-touch/packages/utils':
+    resolution: {directory: ../talex-touch/packages/utils, type: directory}
     peerDependencies:
       electron: ^40.0.0
       vue: ^3.5.27
@@ -8396,6 +8402,14 @@ snapshots:
       - vue
 
   '@talex-touch/utils@1.0.44(electron@37.6.0)(vue@3.5.25(typescript@5.9.3))':
+    dependencies:
+      '@vueuse/core': 14.2.1(vue@3.5.25(typescript@5.9.3))
+      electron: 37.6.0
+      marked: 17.0.3
+      path-browserify: 1.0.1
+      vue: 3.5.25(typescript@5.9.3)
+
+  '@talex-touch/utils@file:../talex-touch/packages/utils(electron@37.6.0)(vue@3.5.25(typescript@5.9.3))':
     dependencies:
       '@vueuse/core': 14.2.1(vue@3.5.25(typescript@5.9.3))
       electron: 37.6.0

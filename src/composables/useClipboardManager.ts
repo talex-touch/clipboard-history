@@ -4,6 +4,7 @@ import {
   onCoreBoxInputChange,
   onCoreBoxKeyEvent,
   useBox,
+  useChannel,
   useClipboard,
 } from '@talex-touch/utils/plugin/sdk'
 import structuredClonePolyfill from '@ungap/structured-clone'
@@ -44,6 +45,8 @@ interface ForwardedHotkeyCache {
   signature: string
   at: number
 }
+
+const COREBOX_TRIGGER_PREFIXES = ['clipboard-history', '剪贴板历史记录', '剪贴板']
 
 function escapeSelector(value: string) {
   if (typeof CSS !== 'undefined' && typeof CSS.escape === 'function')
@@ -88,16 +91,43 @@ function resolveCoreBoxInputKeyword(payload: unknown): string {
     : root) as Record<string, unknown>
 
   if (typeof source.input === 'string')
-    return source.input
+    return normalizeCoreBoxKeyword(source.input)
 
   const query = source.query
   if (query && typeof query === 'object') {
     const text = (query as Record<string, unknown>).text
     if (typeof text === 'string')
-      return text
+      return normalizeCoreBoxKeyword(text)
   }
 
   return ''
+}
+
+function normalizeCoreBoxKeyword(input: string): string {
+  const keyword = input.trim()
+  if (!keyword)
+    return ''
+
+  const lowerKeyword = keyword.toLowerCase()
+  for (const trigger of COREBOX_TRIGGER_PREFIXES) {
+    const normalizedTrigger = trigger.trim()
+    if (!normalizedTrigger)
+      continue
+
+    const lowerTrigger = normalizedTrigger.toLowerCase()
+    if (lowerKeyword === lowerTrigger)
+      return ''
+
+    if (
+      lowerKeyword.startsWith(`${lowerTrigger} `)
+      || lowerKeyword.startsWith(`${lowerTrigger}:`)
+      || lowerKeyword.startsWith(`${lowerTrigger}：`)
+    ) {
+      return keyword.slice(normalizedTrigger.length).trim()
+    }
+  }
+
+  return keyword
 }
 
 function resolveCoreBoxForwardedKey(payload: unknown): HotkeyEventLike | null {
@@ -141,10 +171,276 @@ function shouldIgnoreForwardedEditingShortcut(event: HotkeyEventLike): boolean {
   return ['a', 'c', 'v', 'x', 'z', 'y'].includes(key)
 }
 
+function isFiniteNumber(value: unknown): value is number {
+  return typeof value === 'number' && Number.isFinite(value)
+}
+
+function pickFirstNonEmptyString(...values: unknown[]): string {
+  for (const value of values) {
+    if (typeof value === 'string' && value.trim())
+      return value.trim()
+  }
+  return ''
+}
+
+function parseMetaRecord(value: unknown): Record<string, unknown> | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value))
+    return null
+  return { ...(value as Record<string, unknown>) }
+}
+
+function parseMetadataString(value: unknown): Record<string, unknown> | null {
+  if (typeof value !== 'string' || !value.trim())
+    return null
+
+  try {
+    return parseMetaRecord(JSON.parse(value))
+  }
+  catch {
+    return null
+  }
+}
+
+function normalizeItemId(value: unknown): number | undefined {
+  if (isFiniteNumber(value))
+    return Number(value)
+
+  if (typeof value === 'string' && value.trim()) {
+    const numeric = Number(value)
+    if (Number.isFinite(numeric))
+      return numeric
+  }
+
+  return undefined
+}
+
+function normalizeItemTimestamp(item: any): string | number | Date | null {
+  if (isFiniteNumber(item?.createdAt))
+    return Number(item.createdAt)
+  if (isFiniteNumber(item?.timestamp))
+    return Number(item.timestamp)
+  if (item?.timestamp instanceof Date)
+    return item.timestamp
+  if (typeof item?.timestamp === 'string' && item.timestamp.trim())
+    return item.timestamp.trim()
+  return null
+}
+
 export function useClipboardManager() {
   const clipboard = import.meta.env.SSR ? null : useClipboard()
   const clipboardHistory = (clipboard?.history ?? {}) as ClipboardHistoryClient
   const box = useBox()
+  const channel = import.meta.env.SSR ? null : useChannel()
+
+  function debugLog(stage: string, meta?: Record<string, unknown>) {
+    const ts = new Date().toISOString()
+    if (meta)
+      // eslint-disable-next-line no-console
+      console.debug(`[ClipboardManager][${ts}] ${stage}`, meta)
+    else
+      // eslint-disable-next-line no-console
+      console.debug(`[ClipboardManager][${ts}] ${stage}`)
+  }
+
+  function normalizeTransportType(rawType: unknown): 'text' | 'image' | 'files' {
+    const normalized = String(rawType ?? '').toLowerCase()
+    if (normalized.includes('image'))
+      return 'image'
+    if (normalized.includes('files'))
+      return 'files'
+    return 'text'
+  }
+
+  function mapTransportItemToPluginItem(item: any): PluginClipboardItem {
+    const meta: Record<string, unknown> = {
+      ...(parseMetadataString(item?.metadata) ?? {}),
+      ...(parseMetaRecord(item?.meta) ?? {}),
+    }
+
+    if (Array.isArray(item?.tags) && item.tags.length)
+      meta.tags = item.tags
+
+    const imageOriginalUrl = pickFirstNonEmptyString(
+      item?.image_original_url,
+      item?.imageOriginalUrl,
+      (meta as Record<string, unknown>)?.image_original_url,
+    )
+    if (imageOriginalUrl)
+      meta.image_original_url = imageOriginalUrl
+
+    const content = pickFirstNonEmptyString(item?.value, item?.content, item?.text)
+    const rawContent = pickFirstNonEmptyString(item?.html, item?.rawContent)
+    const sourceApp = pickFirstNonEmptyString(item?.source, item?.sourceApp)
+    const thumbnail = pickFirstNonEmptyString(item?.thumbnail)
+
+    return {
+      id: normalizeItemId(item?.id),
+      type: normalizeTransportType(item?.type),
+      content,
+      thumbnail: thumbnail || null,
+      rawContent: rawContent || null,
+      sourceApp: sourceApp || null,
+      timestamp: normalizeItemTimestamp(item),
+      isFavorite: typeof item?.isFavorite === 'boolean' ? item.isFavorite : null,
+      metadata: typeof item?.metadata === 'string' ? item.metadata : null,
+      meta: Object.keys(meta).length > 0 ? meta : null,
+    }
+  }
+
+  async function getHistoryImageUrlCompat(id: number): Promise<string> {
+    const normalizedId = Number(id)
+    if (!Number.isFinite(normalizedId))
+      return ''
+
+    if (clipboard?.getHistoryImageUrl) {
+      try {
+        const url = await clipboard.getHistoryImageUrl(normalizedId)
+        if (typeof url === 'string' && url.trim()) {
+          debugLog('imageUrl:source', { source: 'sdk', id: normalizedId })
+          return url.trim()
+        }
+      }
+      catch (error) {
+        debugLog('imageUrl:sdk-error', { id: normalizedId, error: formatError(error) })
+      }
+    }
+
+    if (!channel)
+      return ''
+
+    const candidates = [
+      'clipboard:history:image-url',
+      'clipboard:history:get-image-url',
+      'clipboard:get-image-url',
+    ]
+
+    for (const eventName of candidates) {
+      try {
+        const response = await channel.send(eventName, { id: normalizedId })
+        const url = pickFirstNonEmptyString(
+          response,
+          (response as Record<string, unknown> | null)?.url,
+        )
+        if (url) {
+          debugLog('imageUrl:source', { source: `channel:${eventName}`, id: normalizedId })
+          return url
+        }
+      }
+      catch (error) {
+        debugLog('imageUrl:channel-error', {
+          id: normalizedId,
+          eventName,
+          error: formatError(error),
+        })
+      }
+    }
+
+    debugLog('imageUrl:not-found', { id: normalizedId })
+    return ''
+  }
+
+  function hasValidHistoryShape(payload: any): boolean {
+    return (
+      payload
+      && typeof payload === 'object'
+      && Array.isArray(payload.history)
+      && isFiniteNumber(payload.total)
+      && isFiniteNumber(payload.page)
+      && isFiniteNumber(payload.pageSize)
+    )
+  }
+
+  async function getHistoryCompat(
+    targetPage: number,
+    nextKeyword: string,
+  ): Promise<{ history: PluginClipboardItem[], total: number, page: number, pageSize: number }> {
+    // 1) Prefer SDK result when shape is complete.
+    try {
+      const sdkPayload = await clipboardHistory.getHistory({ page: targetPage, keyword: nextKeyword })
+      if (hasValidHistoryShape(sdkPayload)) {
+        debugLog('loadHistory:source', { source: 'sdk' })
+        return sdkPayload
+      }
+      debugLog('loadHistory:invalid-sdk-shape', {
+        hasHistoryArray: Array.isArray((sdkPayload as any)?.history),
+        total: (sdkPayload as any)?.total,
+        page: (sdkPayload as any)?.page,
+        pageSize: (sdkPayload as any)?.pageSize,
+      })
+    }
+    catch (error) {
+      debugLog('loadHistory:sdk-error', { error: formatError(error) })
+    }
+
+    // 2) Fallback to new transport event (clipboard:history:get).
+    if (channel) {
+      const raw = await channel.send('clipboard:history:get', {
+        page: targetPage,
+        keyword: nextKeyword,
+      })
+      const items = Array.isArray(raw?.items)
+        ? raw.items.map((item: any) => mapTransportItemToPluginItem(item))
+        : []
+      const total = isFiniteNumber(raw?.total) ? Number(raw.total) : items.length
+      const page = isFiniteNumber(raw?.page) ? Number(raw.page) : targetPage
+      const pageSize = isFiniteNumber(raw?.pageSize)
+        ? Number(raw.pageSize)
+        : isFiniteNumber(raw?.limit)
+          ? Number(raw.limit)
+          : 20
+
+      const imageSample = items.find((entry: PluginClipboardItem) => entry.type === 'image')
+      if (imageSample) {
+        debugLog('loadHistory:image-sample', {
+          hasThumbnail: Boolean(imageSample.thumbnail),
+          hasImageOriginalUrl: Boolean(getImageOriginalUrl(imageSample)),
+          contentPrefix: imageSample.content?.slice(0, 24) ?? '',
+        })
+      }
+
+      debugLog('loadHistory:source', { source: 'channel:clipboard:history:get' })
+      return { history: items, total, page, pageSize }
+    }
+
+    return { history: [], total: 0, page: targetPage, pageSize: 20 }
+  }
+
+  async function setFavoriteCompat(id: number, isFavorite: boolean): Promise<void> {
+    if (channel) {
+      await channel.send('clipboard:history:set-favorite', { id, isFavorite })
+      return
+    }
+    await clipboardHistory.setFavorite({ id, isFavorite })
+  }
+
+  async function deleteItemCompat(id: number): Promise<void> {
+    if (channel) {
+      await channel.send('clipboard:history:delete', { id })
+      return
+    }
+    await clipboardHistory.deleteItem({ id })
+  }
+
+  async function clearHistoryCompat(): Promise<void> {
+    if (channel) {
+      await channel.send('clipboard:history:clear')
+      return
+    }
+    await clipboardHistory.clearHistory()
+  }
+
+  async function copyAndPasteCompat(payload: Record<string, unknown>): Promise<boolean> {
+    if (channel) {
+      const response = await channel.send('clipboard:action:copy-and-paste', payload)
+      if (response && typeof response === 'object' && 'success' in response)
+        return Boolean((response as { success?: boolean }).success)
+      return true
+    }
+
+    if (clipboard?.copyAndPaste)
+      return clipboard.copyAndPaste(payload as any)
+    return false
+  }
 
   const state = reactive({
     clipboardItems: [] as PluginClipboardItem[],
@@ -185,6 +481,11 @@ export function useClipboardManager() {
   let activeHistoryRequestId = 0
   let lastForwardedHotkey: ForwardedHotkeyCache | null = null
 
+  debugLog('init', {
+    hasClipboardSdk: Boolean(clipboard),
+    hasHistoryApi: Boolean(clipboardHistory?.getHistory),
+  })
+
   watchEffect(() => {
     state.canLoadMore = !state.hasReachedHistoryEnd && state.clipboardItems.length < state.total
   })
@@ -218,8 +519,8 @@ export function useClipboardManager() {
   }
 
   async function resolveImageSource(item: PluginClipboardItem): Promise<string> {
-    if (item.id != null && clipboard?.getHistoryImageUrl) {
-      const url = await clipboard.getHistoryImageUrl(Number(item.id))
+    if (item.id != null) {
+      const url = await getHistoryImageUrlCompat(Number(item.id))
       if (url)
         return url
     }
@@ -266,11 +567,8 @@ export function useClipboardManager() {
     if (getImageOriginalUrl(item))
       return
 
-    if (!clipboard?.getHistoryImageUrl)
-      return
-
     try {
-      const url = await clipboard.getHistoryImageUrl(Number(item.id))
+      const url = await getHistoryImageUrlCompat(Number(item.id))
       if (!url)
         return
       patchItemMeta(getItemKey(item), { image_original_url: url })
@@ -483,6 +781,17 @@ export function useClipboardManager() {
     } = options
     const requestId = ++activeHistoryRequestId
     const nextKeyword = typeof keyword === 'string' ? keyword : state.queryKeyword
+    const startedAt = performance.now()
+    debugLog('loadHistory:start', {
+      requestId,
+      reset,
+      showInitialSpinner,
+      ensureSelectionVisible,
+      targetKeyword: nextKeyword,
+      currentPage: state.page,
+      currentTotal: state.total,
+      canLoadMore: state.canLoadMore,
+    })
 
     if (showInitialSpinner || reset)
       state.errorMessage = null
@@ -494,8 +803,16 @@ export function useClipboardManager() {
 
     const targetPage = reset ? 1 : state.page + 1
 
-    if (!reset && !state.canLoadMore)
+    if (!reset && !state.canLoadMore) {
+      debugLog('loadHistory:skip', {
+        requestId,
+        reason: 'no_more_data',
+        currentPage: state.page,
+        total: state.total,
+        loaded: state.clipboardItems.length,
+      })
       return
+    }
 
     if (showInitialSpinner)
       state.isLoading = true
@@ -503,9 +820,15 @@ export function useClipboardManager() {
       state.isLoadingMore = true
 
     try {
-      const payload = await clipboardHistory.getHistory({ page: targetPage, keyword: nextKeyword })
-      if (requestId !== activeHistoryRequestId)
+      const payload = await getHistoryCompat(targetPage, nextKeyword)
+      if (requestId !== activeHistoryRequestId) {
+        debugLog('loadHistory:stale-response', {
+          requestId,
+          activeHistoryRequestId,
+          targetPage,
+        })
         return
+      }
       const historyItems = payload.history ?? []
       const previousLength = reset ? 0 : state.clipboardItems.length
       const resolvedPage = typeof payload.page === 'number' ? payload.page : targetPage
@@ -537,11 +860,37 @@ export function useClipboardManager() {
 
       if (ensureSelectionVisible)
         ensureSelection()
+
+      debugLog('loadHistory:success', {
+        requestId,
+        requestedPage: targetPage,
+        resolvedPage,
+        pageSize: resolvedPageSize,
+        fetchedCount: historyItems.length,
+        previousLength,
+        nextLength,
+        total: payload.total,
+        hasReachedHistoryEnd: state.hasReachedHistoryEnd,
+        durationMs: Math.round(performance.now() - startedAt),
+      })
     }
     catch (error) {
-      if (requestId !== activeHistoryRequestId)
+      if (requestId !== activeHistoryRequestId) {
+        debugLog('loadHistory:error-ignored', {
+          requestId,
+          activeHistoryRequestId,
+          error: formatError(error),
+        })
         return
+      }
       state.errorMessage = formatError(error)
+      debugLog('loadHistory:error', {
+        requestId,
+        targetPage,
+        keyword: nextKeyword,
+        error: state.errorMessage,
+        durationMs: Math.round(performance.now() - startedAt),
+      })
     }
     finally {
       if (requestId === activeHistoryRequestId) {
@@ -549,6 +898,15 @@ export function useClipboardManager() {
           state.isLoading = false
         if (!showInitialSpinner && !reset)
           state.isLoadingMore = false
+
+        debugLog('loadHistory:finalize', {
+          requestId,
+          isLoading: state.isLoading,
+          isLoadingMore: state.isLoadingMore,
+          page: state.page,
+          loaded: state.clipboardItems.length,
+          total: state.total,
+        })
       }
     }
   }
@@ -572,16 +930,16 @@ export function useClipboardManager() {
       const payload = cloneClipboardItem(item)
 
       // 优先使用新的 copyAndPaste API
-      if (clipboard?.copyAndPaste) {
+      if (clipboard?.copyAndPaste || channel) {
         let success = false
         if (item.type === 'image') {
           const imageSource = await resolveImageSource(item)
           if (!imageSource)
             throw new Error('无法解析图片内容')
-          success = await clipboard.copyAndPaste({ image: imageSource, hideCoreBox: true })
+          success = await copyAndPasteCompat({ image: imageSource, hideCoreBox: true })
         }
         else if (item.type === 'text' && item.rawContent) {
-          success = await clipboard.copyAndPaste({
+          success = await copyAndPasteCompat({
             text: item.content ?? '',
             html: item.rawContent,
             hideCoreBox: true,
@@ -590,12 +948,12 @@ export function useClipboardManager() {
         else if (item.type === 'files') {
           const files = parseFileListFromItem(item)
           if (files.length)
-            success = await clipboard.copyAndPaste({ files, hideCoreBox: true })
+            success = await copyAndPasteCompat({ files, hideCoreBox: true })
           else
-            success = await clipboard.copyAndPaste({ text: item.content ?? '', hideCoreBox: true })
+            success = await copyAndPasteCompat({ text: item.content ?? '', hideCoreBox: true })
         }
         else {
-          success = await clipboard.copyAndPaste({ text: item.content ?? '', hideCoreBox: true })
+          success = await copyAndPasteCompat({ text: item.content ?? '', hideCoreBox: true })
         }
         if (!success)
           throw new Error('自动粘贴失败')
@@ -638,10 +996,7 @@ export function useClipboardManager() {
     const nextState = !state.selectedItem.isFavorite
 
     try {
-      await clipboardHistory.setFavorite({
-        id: Number(state.selectedItem.id),
-        isFavorite: nextState,
-      })
+      await setFavoriteCompat(Number(state.selectedItem.id), nextState)
 
       const key = getItemKey(state.selectedItem)
       const index = state.clipboardItems.findIndex((item: any) => getItemKey(item) === key)
@@ -671,7 +1026,7 @@ export function useClipboardManager() {
     const key = getItemKey(state.selectedItem)
 
     try {
-      await clipboardHistory.deleteItem({ id: Number(state.selectedItem.id) })
+      await deleteItemCompat(Number(state.selectedItem.id))
 
       state.clipboardItems = state.clipboardItems.filter((item: any) => getItemKey(item) !== key)
       state.total = Math.max(0, state.total - 1)
@@ -693,7 +1048,7 @@ export function useClipboardManager() {
     state.isClearing = true
     state.errorMessage = null
     try {
-      await clipboardHistory.clearHistory()
+      await clearHistoryCompat()
       state.clipboardItems = []
       state.total = 0
       ensureSelection()
@@ -722,7 +1077,7 @@ export function useClipboardManager() {
 
     try {
       for (const item of itemsToDelete)
-        await clipboardHistory.deleteItem({ id: Number(item.id) })
+        await deleteItemCompat(Number(item.id))
 
       state.clipboardItems = state.clipboardItems.filter((item: any) => !targetKeys.has(getItemKey(item)))
       const deletedCount = itemsToDelete.length
@@ -756,7 +1111,7 @@ export function useClipboardManager() {
 
     try {
       for (const item of itemsToFavorite)
-        await clipboardHistory.setFavorite({ id: Number(item.id), isFavorite: true })
+        await setFavoriteCompat(Number(item.id), true)
 
       state.clipboardItems = state.clipboardItems.map((item: any) => {
         if (!targetKeys.has(getItemKey(item)))
@@ -792,32 +1147,57 @@ export function useClipboardManager() {
 
     state.hasReachedHistoryEnd = false
     ensureSelection(key)
+    debugLog('stream:onDidChange', {
+      key,
+      type: item.type,
+      mergedAtIndex: index,
+      loaded: state.clipboardItems.length,
+      total: state.total,
+    })
   }
 
   async function bootstrap() {
     state.errorMessage = null
+    debugLog('bootstrap:start')
     try {
       await box.allowInput()
       try {
-        state.queryKeyword = await box.getInput()
+        state.queryKeyword = normalizeCoreBoxKeyword(await box.getInput())
+        debugLog('bootstrap:input-ready', {
+          queryKeyword: state.queryKeyword,
+        })
       }
       catch {
         state.queryKeyword = ''
+        debugLog('bootstrap:input-fallback-empty')
       }
       await loadHistory({ reset: true, showInitialSpinner: true })
       await box.allowClipboard(ClipboardTypePresets.ALL)
       stopClipboardListener = clipboardHistory.onDidChange(handleClipboardChange)
+      debugLog('bootstrap:stream-ready')
     }
     catch (error) {
       state.errorMessage = formatError(error)
+      debugLog('bootstrap:error', {
+        error: state.errorMessage,
+      })
     }
     finally {
       state.isLoading = false
+      debugLog('bootstrap:done', {
+        isLoading: state.isLoading,
+        loaded: state.clipboardItems.length,
+        total: state.total,
+      })
     }
   }
 
   onCoreBoxInputChange(async (payload) => {
     const nextKeyword = resolveCoreBoxInputKeyword(payload)
+    debugLog('input:change', {
+      previousKeyword: state.queryKeyword,
+      nextKeyword,
+    })
     if (nextKeyword === state.queryKeyword)
       return
     state.queryKeyword = nextKeyword
@@ -850,6 +1230,7 @@ export function useClipboardManager() {
   onBeforeUnmount(() => {
     stopClipboardListener?.()
     stopHotkeys?.()
+    debugLog('destroy')
   })
 
   return Object.assign(state, {
