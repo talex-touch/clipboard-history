@@ -52,9 +52,16 @@ watch(
 
     // Preload full resolution image
     const img = new Image()
+    const loadTimeout = setTimeout(() => {
+      if (requestId !== loadRequestId.value)
+        return
+      hdLoaded.value = true
+      debugLog('load:timeout', { requestId, source: newSrc.slice(0, 96) })
+    }, 2500)
     img.onload = () => {
       if (requestId !== loadRequestId.value)
         return
+      clearTimeout(loadTimeout)
       hdSrc.value = newSrc
       hdLoaded.value = true
       debugLog('load:success', { requestId, source: newSrc.slice(0, 96) })
@@ -62,6 +69,7 @@ watch(
     img.onerror = () => {
       if (requestId !== loadRequestId.value)
         return
+      clearTimeout(loadTimeout)
       // Fallback to thumbnail on error
       hdLoaded.value = true
       debugLog('load:error', { requestId, source: newSrc.slice(0, 96) })

@@ -432,8 +432,12 @@ export function useClipboardManager() {
   async function copyAndPasteCompat(payload: Record<string, unknown>): Promise<boolean> {
     if (channel) {
       const response = await channel.send('clipboard:action:copy-and-paste', payload)
-      if (response && typeof response === 'object' && 'success' in response)
-        return Boolean((response as { success?: boolean }).success)
+      if (response && typeof response === 'object' && 'success' in response) {
+        const result = response as { success?: boolean, message?: string }
+        if (!result.success && result.message)
+          throw new Error(result.message)
+        return Boolean(result.success)
+      }
       return true
     }
 
