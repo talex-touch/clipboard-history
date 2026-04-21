@@ -10,12 +10,15 @@ const props = defineProps<{
   thumbnail?: string
   /** Full resolution image source */
   src: string
+  /** Whether only a thumbnail source is currently available */
+  thumbnailOnly?: boolean
   /** Alt text for accessibility */
   alt?: string
 }>()
 
 const hdLoaded = ref(false)
 const hdSrc = ref('')
+const fallbackReason = ref<'timeout' | 'error' | ''>('')
 const loadRequestId = ref(0)
 
 function debugLog(stage: string, meta?: Record<string, unknown>) {
@@ -35,6 +38,7 @@ watch(
     const requestId = ++loadRequestId.value
     hdLoaded.value = false
     hdSrc.value = ''
+    fallbackReason.value = ''
 
     debugLog('load:start', {
       requestId,
@@ -44,7 +48,6 @@ watch(
     })
 
     if (!newSrc || !newThumbnail || newSrc === newThumbnail) {
-      // No progressive loading needed
       hdLoaded.value = true
       debugLog('load:skip', { requestId })
       return
@@ -56,6 +59,7 @@ watch(
       if (requestId !== loadRequestId.value)
         return
       hdLoaded.value = true
+      fallbackReason.value = 'timeout'
       debugLog('load:timeout', { requestId, source: newSrc.slice(0, 96) })
     }, 2500)
     img.onload = () => {
@@ -64,14 +68,15 @@ watch(
       clearTimeout(loadTimeout)
       hdSrc.value = newSrc
       hdLoaded.value = true
+      fallbackReason.value = ''
       debugLog('load:success', { requestId, source: newSrc.slice(0, 96) })
     }
     img.onerror = () => {
       if (requestId !== loadRequestId.value)
         return
       clearTimeout(loadTimeout)
-      // Fallback to thumbnail on error
       hdLoaded.value = true
+      fallbackReason.value = 'error'
       debugLog('load:error', { requestId, source: newSrc.slice(0, 96) })
     }
     img.src = newSrc
@@ -88,7 +93,25 @@ const displaySrc = computed(() => {
 })
 
 const isLoadingHD = computed(() => {
-  return props.thumbnail && props.src !== props.thumbnail && !hdLoaded.value
+  return Boolean(props.thumbnail && props.src !== props.thumbnail && !hdLoaded.value)
+})
+
+const isShowingFallback = computed(() => {
+  return Boolean(
+    props.thumbnail
+    && (
+      props.thumbnailOnly
+      || (props.src && props.src !== props.thumbnail && fallbackReason.value)
+    ),
+  )
+})
+
+const fallbackText = computed(() => {
+  if (props.thumbnailOnly)
+    return '原图暂不可用，正在显示缩略图'
+  return fallbackReason.value === 'timeout'
+    ? '原图加载超时，正在显示缩略图'
+    : '原图加载失败，正在显示缩略图'
 })
 </script>
 
@@ -99,11 +122,14 @@ const isLoadingHD = computed(() => {
         :src="displaySrc"
         :alt="alt || '剪贴图片预览'"
         class="preview-img max-w-full w-full rounded-3 object-contain transition-all duration-300"
-        :class="{ 'is-thumbnail': isLoadingHD }"
       >
-      <!-- Loading indicator -->
       <div v-if="isLoadingHD" class="loading-indicator">
         <span class="i-carbon-image text-lg opacity-60" />
+        <span>加载原图中</span>
+      </div>
+      <div v-else-if="isShowingFallback" class="fallback-indicator">
+        <span class="i-carbon-warning-alt text-lg opacity-75" />
+        <span>{{ fallbackText }}</span>
       </div>
     </div>
   </div>
@@ -123,12 +149,8 @@ const isLoadingHD = computed(() => {
   max-height: 100%;
 }
 
-.preview-img.is-thumbnail {
-  filter: blur(2px);
-  transform: scale(1.02);
-}
-
-.loading-indicator {
+.loading-indicator,
+.fallback-indicator {
   position: absolute;
   bottom: 8px;
   right: 8px;
@@ -140,7 +162,15 @@ const isLoadingHD = computed(() => {
   display: flex;
   align-items: center;
   gap: 4px;
+}
+
+.loading-indicator {
   animation: pulse 1.5s ease-in-out infinite;
+}
+
+.fallback-indicator {
+  max-width: calc(100% - 16px);
+  background: rgba(0, 0, 0, 0.64);
 }
 
 @keyframes pulse {

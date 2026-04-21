@@ -18,6 +18,8 @@
 - 🦾 TypeScript, of course.
 - ⚙️ Unit Testing with [Vitest](https://github.com/vitest-dev/vitest).
 - ☁️ Deploy on pnpm, zero-config.
+- 🖼️ Image previews resolve the original clipboard image on demand and fall back to thumbnails with an explicit status.
+- 🔁 Clipboard change subscriptions degrade gracefully when the host transport does not expose streams.
 
 <br>
 

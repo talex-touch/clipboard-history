@@ -28,6 +28,7 @@ interface LoadHistoryOptions {
   reset?: boolean
   showInitialSpinner?: boolean
   ensureSelectionVisible?: boolean
+  suppressError?: boolean
   keyword?: string
 }
 
@@ -482,6 +483,8 @@ export function useClipboardManager() {
 
   let stopClipboardListener: (() => void) | null = null
   let stopHotkeys: (() => void) | undefined
+  let clipboardFallbackTimer: number | null = null
+  let clipboardFallbackRefreshPending = false
   let activeHistoryRequestId = 0
   let lastForwardedHotkey: ForwardedHotkeyCache | null = null
 
@@ -523,16 +526,15 @@ export function useClipboardManager() {
   }
 
   async function resolveImageSource(item: PluginClipboardItem): Promise<string> {
+    const metaUrl = getImageOriginalUrl(item)
+    if (metaUrl)
+      return ensureTFileUrl(metaUrl)
+
     if (item.id != null) {
       const url = await getHistoryImageUrlCompat(Number(item.id))
       if (url)
-        return url
+        return ensureTFileUrl(url)
     }
-
-    const meta = item.meta && typeof item.meta === 'object' ? item.meta : null
-    const metaUrl = meta && 'image_original_url' in meta ? (meta as Record<string, unknown>).image_original_url : null
-    if (typeof metaUrl === 'string' && metaUrl.trim())
-      return metaUrl.trim()
 
     const content = (item.content ?? '').trim()
     if (!content)
@@ -781,6 +783,7 @@ export function useClipboardManager() {
       reset = false,
       showInitialSpinner = false,
       ensureSelectionVisible = true,
+      suppressError = false,
       keyword,
     } = options
     const requestId = ++activeHistoryRequestId
@@ -887,12 +890,13 @@ export function useClipboardManager() {
         })
         return
       }
-      state.errorMessage = formatError(error)
+      if (!suppressError)
+        state.errorMessage = formatError(error)
       debugLog('loadHistory:error', {
         requestId,
         targetPage,
         keyword: nextKeyword,
-        error: state.errorMessage,
+        error: formatError(error),
         durationMs: Math.round(performance.now() - startedAt),
       })
     }
@@ -1160,6 +1164,55 @@ export function useClipboardManager() {
     })
   }
 
+  async function refreshHistoryFromFallback() {
+    if (clipboardFallbackRefreshPending)
+      return
+    if (typeof document !== 'undefined' && document.visibilityState === 'hidden')
+      return
+
+    clipboardFallbackRefreshPending = true
+    try {
+      await loadHistory({
+        reset: true,
+        showInitialSpinner: false,
+        ensureSelectionVisible: true,
+        suppressError: true,
+      })
+    }
+    finally {
+      clipboardFallbackRefreshPending = false
+    }
+  }
+
+  function startClipboardPollingFallback(reason: unknown) {
+    debugLog('stream:fallback-polling', { reason: formatError(reason) })
+    if (clipboardFallbackTimer || typeof window === 'undefined')
+      return
+
+    clipboardFallbackTimer = window.setInterval(() => {
+      void refreshHistoryFromFallback()
+    }, 5000)
+    void refreshHistoryFromFallback()
+  }
+
+  function stopClipboardPollingFallback() {
+    if (!clipboardFallbackTimer)
+      return
+    window.clearInterval(clipboardFallbackTimer)
+    clipboardFallbackTimer = null
+  }
+
+  function startClipboardChangeListener() {
+    try {
+      stopClipboardListener = clipboardHistory.onDidChange(handleClipboardChange)
+      debugLog('bootstrap:stream-ready')
+    }
+    catch (error) {
+      stopClipboardListener = null
+      startClipboardPollingFallback(error)
+    }
+  }
+
   async function bootstrap() {
     state.errorMessage = null
     debugLog('bootstrap:start')
@@ -1177,8 +1230,7 @@ export function useClipboardManager() {
       }
       await loadHistory({ reset: true, showInitialSpinner: true })
       await box.allowClipboard(ClipboardTypePresets.ALL)
-      stopClipboardListener = clipboardHistory.onDidChange(handleClipboardChange)
-      debugLog('bootstrap:stream-ready')
+      startClipboardChangeListener()
     }
     catch (error) {
       state.errorMessage = formatError(error)
@@ -1233,6 +1285,7 @@ export function useClipboardManager() {
 
   onBeforeUnmount(() => {
     stopClipboardListener?.()
+    stopClipboardPollingFallback()
     stopHotkeys?.()
     debugLog('destroy')
   })

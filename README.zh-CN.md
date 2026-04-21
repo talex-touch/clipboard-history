@@ -18,6 +18,8 @@
 - 🦾 TypeScript, of course.
 - ⚙️ 使用 [Vitest](https://github.com/vitest-dev/vitest) 进行单元测试。
 - ☁️ 零配置部署到 npm。
+- 🖼️ 图片详情按需解析剪贴板原图，原图不可用时明确展示缩略图降级状态。
+- 🔁 宿主 transport 不支持 stream 时，剪贴板变更订阅会降级而不阻断插件启动。
 
 <br>
 

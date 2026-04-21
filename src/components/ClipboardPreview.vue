@@ -277,6 +277,13 @@ function getImageOriginalUrl(item: PluginClipboardItem | null): string {
   return ''
 }
 
+function getImageContentKind(item: PluginClipboardItem | null): string {
+  if (!item || !item.meta || typeof item.meta !== 'object')
+    return ''
+  const raw = (item.meta as Record<string, unknown>).image_content_kind
+  return typeof raw === 'string' ? raw.trim() : ''
+}
+
 // Thumbnail for fast initial display
 const thumbnailSrc = computed(() => {
   if (!props.item)
@@ -307,6 +314,21 @@ const fullImageSrc = computed(() => {
       return ensureTFileUrl(candidate)
   }
   return ''
+})
+
+const imageHasOriginalSource = computed(() => {
+  if (!props.item || primaryType.value !== 'image')
+    return false
+  if (getImageOriginalUrl(props.item))
+    return true
+
+  const content = typeof props.item.content === 'string' ? props.item.content.trim() : ''
+  if (!content)
+    return false
+  if (getImageContentKind(props.item) === 'preview')
+    return false
+
+  return content !== (props.item.thumbnail ?? '')
 })
 
 const linkHref = computed(() => {
@@ -355,6 +377,7 @@ const isLinkType = computed(() =>
           v-else-if="derivedType === 'data-url-image' || primaryType === 'image'"
           :thumbnail="thumbnailSrc"
           :src="fullImageSrc || thumbnailSrc || item.content"
+          :thumbnail-only="primaryType === 'image' && !imageHasOriginalSource"
         />
         <PreviewFiles
           v-else-if="isFileType"
