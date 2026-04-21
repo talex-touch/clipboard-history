@@ -20,8 +20,11 @@ jobs:
           node-version: lts/*
           cache: pnpm
 
+      - name: Prepare published utils dependency
+        run: node "scripts/prepare-ci-utils-dependency.mjs"
+
       - name: Install
-        run: pnpm install
+        run: pnpm install --no-frozen-lockfile
 
       - name: Lint
         run: pnpm run lint
@@ -36,8 +39,11 @@ jobs:
           node-version: lts/*
           cache: pnpm
 
+      - name: Prepare published utils dependency
+        run: node "scripts/prepare-ci-utils-dependency.mjs"
+
       - name: Install
-        run: pnpm install
+        run: pnpm install --no-frozen-lockfile
 
       - name: Typecheck
         run: pnpm run typecheck
@@ -61,7 +67,10 @@ jobs:
           registry-url: https://registry.npmjs.org/
           cache: pnpm
 
-      - run: pnpm install
+      - name: Prepare published utils dependency
+        run: node "scripts/prepare-ci-utils-dependency.mjs"
+
+      - run: pnpm install --no-frozen-lockfile
       - run: pnpm run test:unit
 
   test-e2e:
@@ -83,7 +92,10 @@ jobs:
           registry-url: https://registry.npmjs.org/
           cache: pnpm
 
-      - run: pnpm install
+      - name: Prepare published utils dependency
+        run: node "scripts/prepare-ci-utils-dependency.mjs"
+
+      - run: pnpm install --no-frozen-lockfile
 
       - name: Cypress PNPM Patch
         run: cp pnpm-lock.yaml package-lock.json

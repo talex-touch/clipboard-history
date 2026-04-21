@@ -1,0 +1,109 @@
+name: Clipboard History Publish
+
+on:
+  push:
+    branches:
+      - main
+      - master
+    paths:
+      - package.json
+      - manifest.json
+      - .github/workflows/publish.yml
+
+jobs:
+  publish:
+    name: Build and Publish Plugin
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup PNPM
+        uses: pnpm/action-setup@v3
+        with:
+          version: 10.25.0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.16.0
+          cache: pnpm
+
+      - name: Prepare published utils dependency
+        run: node "scripts/prepare-ci-utils-dependency.mjs"
+
+      - name: Install Dependencies
+        run: pnpm install --no-frozen-lockfile
+
+      - name: Check version bump
+        id: version_check
+        run: |
+          set -euo pipefail
+
+          current_version=$(node -e "const fs=require('fs'); const pkg=JSON.parse(fs.readFileSync('package.json','utf8')); console.log(pkg.version)")
+          manifest_version=$(node -e "const fs=require('fs'); const manifest=JSON.parse(fs.readFileSync('manifest.json','utf8')); console.log(manifest.version)")
+          before_sha="${{ github.event.before }}"
+
+          if [ "${current_version}" != "${manifest_version}" ]; then
+            echo "package.json version (${current_version}) does not match manifest.json version (${manifest_version})."
+            exit 1
+          fi
+
+          echo "current_version=${current_version}" >> "$GITHUB_OUTPUT"
+
+          if [ "${before_sha}" = "0000000000000000000000000000000000000000" ]; then
+            echo "should_publish=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          previous_version=$(git show "${before_sha}:package.json" | node -e "const fs=require('fs'); const pkg=JSON.parse(fs.readFileSync(0,'utf8')); console.log(pkg.version)")
+          echo "previous_version=${previous_version}" >> "$GITHUB_OUTPUT"
+
+          if [ "${current_version}" != "${previous_version}" ]; then
+            echo "should_publish=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "should_publish=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Skip publish (version unchanged)
+        if: steps.version_check.outputs.should_publish != 'true'
+        run: echo "Clipboard History version unchanged. Skipping publish."
+
+      - name: Typecheck
+        if: steps.version_check.outputs.should_publish == 'true'
+        run: pnpm typecheck
+
+      - name: Run tests
+        if: steps.version_check.outputs.should_publish == 'true'
+        run: pnpm exec vitest run
+
+      - name: Build plugin
+        if: steps.version_check.outputs.should_publish == 'true'
+        run: pnpm build
+
+      - name: Verify output
+        if: steps.version_check.outputs.should_publish == 'true'
+        run: |
+          set -euo pipefail
+          version="${{ steps.version_check.outputs.current_version }}"
+          test -f "dist/clipboard-history-${version}.tpex"
+
+      - name: Create GitHub Release
+        if: steps.version_check.outputs.should_publish == 'true'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.version_check.outputs.current_version }}
+          name: Clipboard History v${{ steps.version_check.outputs.current_version }}
+          prerelease: ${{ contains(steps.version_check.outputs.current_version, '-') }}
+          files: |
+            dist/clipboard-history-${{ steps.version_check.outputs.current_version }}.tpex
+          body: |
+            Automated plugin release for clipboard-history v${{ steps.version_check.outputs.current_version }}.
+
+            Asset:
+            - clipboard-history-${{ steps.version_check.outputs.current_version }}.tpex
