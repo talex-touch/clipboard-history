@@ -3,6 +3,11 @@ import type { PluginClipboardItem } from '@talex-touch/utils/plugin/sdk/types'
 import type { ClipboardDerivedType } from '~/composables/useClipboardContentInfo'
 import { computed } from 'vue'
 import { useClipboardContentInfo } from '~/composables/useClipboardContentInfo'
+import {
+  getImageContentKind,
+  hasClipboardDetailImageSource,
+  resolveClipboardDetailImageSource,
+} from '~/utils/clipboard-image'
 import { ensureTFileUrl } from '~/utils/tfile'
 import {
   PreviewColor,
@@ -268,44 +273,25 @@ const fallbackFileDisplay = computed(() => {
 
 const previewText = computed(() => props.item?.content ?? '')
 
-function getImageOriginalUrl(item: PluginClipboardItem | null): string {
-  if (!item || !item.meta || typeof item.meta !== 'object')
-    return ''
-  const raw = (item.meta as Record<string, unknown>).image_original_url
-  if (typeof raw === 'string' && raw.trim())
-    return raw.trim()
-  return ''
-}
-
-function getImageContentKind(item: PluginClipboardItem | null): string {
-  if (!item || !item.meta || typeof item.meta !== 'object')
-    return ''
-  const raw = (item.meta as Record<string, unknown>).image_content_kind
-  return typeof raw === 'string' ? raw.trim() : ''
-}
-
 // Thumbnail for fast initial display
 const thumbnailSrc = computed(() => {
   if (!props.item)
     return ''
   if (primaryType.value === 'image')
-    return props.item.thumbnail || props.item.content || ''
-  return props.item.thumbnail || ''
+    return normalizePreviewImageSource(props.item.thumbnail || props.item.content || '')
+  return normalizePreviewImageSource(props.item.thumbnail || '')
 })
 
 // Full resolution image source
 const fullImageSrc = computed(() => {
   if (!props.item)
     return ''
-  const content = typeof props.item.content === 'string' ? props.item.content : ''
+
   if (primaryType.value === 'image') {
-    const originalUrl = getImageOriginalUrl(props.item)
-    if (originalUrl)
-      return ensureTFileUrl(originalUrl)
-    if (/^(?:data|https?|blob|tfile):/i.test(content))
-      return content
-    return ensureTFileUrl(content)
+    return resolveClipboardDetailImageSource(props.item)
   }
+
+  const content = typeof props.item.content === 'string' ? props.item.content : ''
   if (contentInfo.value.type === 'data-url-image')
     return content
   if (['file-path', 'file-uri'].includes(contentInfo.value.type)) {
@@ -316,20 +302,25 @@ const fullImageSrc = computed(() => {
   return ''
 })
 
-const imageHasOriginalSource = computed(() => {
+const imageHasDetailSource = computed(() => {
   if (!props.item || primaryType.value !== 'image')
     return false
-  if (getImageOriginalUrl(props.item))
+
+  if (hasClipboardDetailImageSource(props.item))
     return true
 
-  const content = typeof props.item.content === 'string' ? props.item.content.trim() : ''
-  if (!content)
-    return false
   if (getImageContentKind(props.item) === 'preview')
-    return false
+    return Boolean(fullImageSrc.value && fullImageSrc.value !== thumbnailSrc.value)
 
-  return content !== (props.item.thumbnail ?? '')
+  return false
 })
+
+function normalizePreviewImageSource(value: string): string {
+  const trimmed = value.trim()
+  if (!trimmed || trimmed.startsWith('data:'))
+    return trimmed
+  return ensureTFileUrl(trimmed)
+}
 
 const linkHref = computed(() => {
   if (!props.item)
@@ -377,7 +368,7 @@ const isLinkType = computed(() =>
           v-else-if="derivedType === 'data-url-image' || primaryType === 'image'"
           :thumbnail="thumbnailSrc"
           :src="fullImageSrc || thumbnailSrc || item.content"
-          :thumbnail-only="primaryType === 'image' && !imageHasOriginalSource"
+          :thumbnail-only="primaryType === 'image' && !imageHasDetailSource"
         />
         <PreviewFiles
           v-else-if="isFileType"

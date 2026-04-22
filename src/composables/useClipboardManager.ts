@@ -1,10 +1,9 @@
-import type { PluginClipboardItem } from '@talex-touch/utils/plugin/sdk/types'
+import type { PluginClipboardHistoryResponse, PluginClipboardItem } from '@talex-touch/utils/plugin/sdk/types'
 import {
   ClipboardTypePresets,
   onCoreBoxInputChange,
   onCoreBoxKeyEvent,
   useBox,
-  useChannel,
   useClipboard,
 } from '@talex-touch/utils/plugin/sdk'
 import structuredClonePolyfill from '@ungap/structured-clone'
@@ -18,6 +17,10 @@ import {
   watchEffect,
 } from 'vue'
 import { toast } from 'vue-sonner'
+import {
+  getImageOriginalUrl,
+  resolveClipboardDetailImageSource,
+} from '~/utils/clipboard-image'
 import { ensureTFileUrl } from '~/utils/tfile'
 import { formatTimestamp, getItemKey } from './clipboardUtils'
 
@@ -153,17 +156,6 @@ function resolveCoreBoxForwardedKey(payload: unknown): HotkeyEventLike | null {
   }
 }
 
-function getImageOriginalUrl(item: PluginClipboardItem | null): string {
-  if (!item || !item.meta || typeof item.meta !== 'object')
-    return ''
-
-  const raw = (item.meta as Record<string, unknown>).image_original_url
-  if (typeof raw === 'string' && raw.trim())
-    return raw.trim()
-
-  return ''
-}
-
 function shouldIgnoreForwardedEditingShortcut(event: HotkeyEventLike): boolean {
   if (!(event.metaKey || event.ctrlKey))
     return false
@@ -202,36 +194,64 @@ function parseMetadataString(value: unknown): Record<string, unknown> | null {
   }
 }
 
-function normalizeItemId(value: unknown): number | undefined {
-  if (isFiniteNumber(value))
-    return Number(value)
-
-  if (typeof value === 'string' && value.trim()) {
-    const numeric = Number(value)
-    if (Number.isFinite(numeric))
-      return numeric
+function normalizePluginHistoryItem(item: PluginClipboardItem): PluginClipboardItem {
+  const itemRecord = item as unknown as Record<string, unknown>
+  const meta: Record<string, unknown> = {
+    ...(parseMetadataString(item.metadata) ?? {}),
+    ...(parseMetaRecord(item.meta) ?? {}),
   }
 
-  return undefined
+  const imageOriginalUrl = pickFirstNonEmptyString(
+    itemRecord.image_original_url,
+    (meta as Record<string, unknown>).image_original_url,
+  )
+  if (imageOriginalUrl)
+    meta.image_original_url = imageOriginalUrl
+
+  const imagePreviewUrl = pickFirstNonEmptyString(
+    itemRecord.image_preview_url,
+    (meta as Record<string, unknown>).image_preview_url,
+  )
+  if (imagePreviewUrl)
+    meta.image_preview_url = imagePreviewUrl
+
+  const imageContentKind = pickFirstNonEmptyString(
+    itemRecord.image_content_kind,
+    (meta as Record<string, unknown>).image_content_kind,
+  )
+  if (imageContentKind)
+    meta.image_content_kind = imageContentKind
+
+  return {
+    ...item,
+    content: pickFirstNonEmptyString(item.content),
+    thumbnail: pickFirstNonEmptyString(item.thumbnail) || null,
+    rawContent: pickFirstNonEmptyString(item.rawContent) || null,
+    sourceApp: pickFirstNonEmptyString(item.sourceApp) || null,
+    meta: Object.keys(meta).length > 0 ? meta : null,
+  }
 }
 
-function normalizeItemTimestamp(item: any): string | number | Date | null {
-  if (isFiniteNumber(item?.createdAt))
-    return Number(item.createdAt)
-  if (isFiniteNumber(item?.timestamp))
-    return Number(item.timestamp)
-  if (item?.timestamp instanceof Date)
-    return item.timestamp
-  if (typeof item?.timestamp === 'string' && item.timestamp.trim())
-    return item.timestamp.trim()
-  return null
+function normalizeHistoryResponse(
+  payload: PluginClipboardHistoryResponse | null | undefined,
+  targetPage: number,
+): PluginClipboardHistoryResponse {
+  const history = Array.isArray(payload?.history)
+    ? payload.history.map(item => normalizePluginHistoryItem(item))
+    : []
+
+  return {
+    history,
+    total: isFiniteNumber(payload?.total) ? Number(payload?.total) : history.length,
+    page: isFiniteNumber(payload?.page) ? Number(payload?.page) : targetPage,
+    pageSize: isFiniteNumber(payload?.pageSize) ? Number(payload?.pageSize) : 20,
+  }
 }
 
 export function useClipboardManager() {
   const clipboard = import.meta.env.SSR ? null : useClipboard()
   const clipboardHistory = (clipboard?.history ?? {}) as ClipboardHistoryClient
   const box = useBox()
-  const channel = import.meta.env.SSR ? null : useChannel()
 
   function debugLog(stage: string, meta?: Record<string, unknown>) {
     const ts = new Date().toISOString()
@@ -243,154 +263,34 @@ export function useClipboardManager() {
       console.debug(`[ClipboardManager][${ts}] ${stage}`)
   }
 
-  function normalizeTransportType(rawType: unknown): 'text' | 'image' | 'files' {
-    const normalized = String(rawType ?? '').toLowerCase()
-    if (normalized.includes('image'))
-      return 'image'
-    if (normalized.includes('files'))
-      return 'files'
-    return 'text'
-  }
-
-  function mapTransportItemToPluginItem(item: any): PluginClipboardItem {
-    const meta: Record<string, unknown> = {
-      ...(parseMetadataString(item?.metadata) ?? {}),
-      ...(parseMetaRecord(item?.meta) ?? {}),
-    }
-
-    if (Array.isArray(item?.tags) && item.tags.length)
-      meta.tags = item.tags
-
-    const imageOriginalUrl = pickFirstNonEmptyString(
-      item?.image_original_url,
-      item?.imageOriginalUrl,
-      (meta as Record<string, unknown>)?.image_original_url,
-    )
-    if (imageOriginalUrl)
-      meta.image_original_url = imageOriginalUrl
-
-    const content = pickFirstNonEmptyString(item?.value, item?.content, item?.text)
-    const rawContent = pickFirstNonEmptyString(item?.html, item?.rawContent)
-    const sourceApp = pickFirstNonEmptyString(item?.source, item?.sourceApp)
-    const thumbnail = pickFirstNonEmptyString(item?.thumbnail)
-
-    return {
-      id: normalizeItemId(item?.id),
-      type: normalizeTransportType(item?.type),
-      content,
-      thumbnail: thumbnail || null,
-      rawContent: rawContent || null,
-      sourceApp: sourceApp || null,
-      timestamp: normalizeItemTimestamp(item),
-      isFavorite: typeof item?.isFavorite === 'boolean' ? item.isFavorite : null,
-      metadata: typeof item?.metadata === 'string' ? item.metadata : null,
-      meta: Object.keys(meta).length > 0 ? meta : null,
-    }
-  }
-
   async function getHistoryImageUrlCompat(id: number): Promise<string> {
     const normalizedId = Number(id)
     if (!Number.isFinite(normalizedId))
       return ''
 
-    if (clipboard?.getHistoryImageUrl) {
-      try {
-        const url = await clipboard.getHistoryImageUrl(normalizedId)
-        if (typeof url === 'string' && url.trim()) {
-          debugLog('imageUrl:source', { source: 'sdk', id: normalizedId })
-          return url.trim()
-        }
-      }
-      catch (error) {
-        debugLog('imageUrl:sdk-error', { id: normalizedId, error: formatError(error) })
+    try {
+      const url = await clipboard?.getHistoryImageUrl?.(normalizedId)
+      if (typeof url === 'string' && url.trim()) {
+        debugLog('imageUrl:source', { source: 'sdk', id: normalizedId })
+        return url.trim()
       }
     }
-
-    if (!channel)
-      return ''
-
-    const candidates = [
-      'clipboard:history:image-url',
-      'clipboard:history:get-image-url',
-      'clipboard:get-image-url',
-    ]
-
-    for (const eventName of candidates) {
-      try {
-        const response = await channel.send(eventName, { id: normalizedId })
-        const url = pickFirstNonEmptyString(
-          response,
-          (response as Record<string, unknown> | null)?.url,
-        )
-        if (url) {
-          debugLog('imageUrl:source', { source: `channel:${eventName}`, id: normalizedId })
-          return url
-        }
-      }
-      catch (error) {
-        debugLog('imageUrl:channel-error', {
-          id: normalizedId,
-          eventName,
-          error: formatError(error),
-        })
-      }
+    catch (error) {
+      debugLog('imageUrl:sdk-error', { id: normalizedId, error: formatError(error) })
     }
 
     debugLog('imageUrl:not-found', { id: normalizedId })
     return ''
   }
 
-  function hasValidHistoryShape(payload: any): boolean {
-    return (
-      payload
-      && typeof payload === 'object'
-      && Array.isArray(payload.history)
-      && isFiniteNumber(payload.total)
-      && isFiniteNumber(payload.page)
-      && isFiniteNumber(payload.pageSize)
-    )
-  }
-
   async function getHistoryCompat(
     targetPage: number,
     nextKeyword: string,
   ): Promise<{ history: PluginClipboardItem[], total: number, page: number, pageSize: number }> {
-    // 1) Prefer SDK result when shape is complete.
     try {
       const sdkPayload = await clipboardHistory.getHistory({ page: targetPage, keyword: nextKeyword })
-      if (hasValidHistoryShape(sdkPayload)) {
-        debugLog('loadHistory:source', { source: 'sdk' })
-        return sdkPayload
-      }
-      debugLog('loadHistory:invalid-sdk-shape', {
-        hasHistoryArray: Array.isArray((sdkPayload as any)?.history),
-        total: (sdkPayload as any)?.total,
-        page: (sdkPayload as any)?.page,
-        pageSize: (sdkPayload as any)?.pageSize,
-      })
-    }
-    catch (error) {
-      debugLog('loadHistory:sdk-error', { error: formatError(error) })
-    }
-
-    // 2) Fallback to new transport event (clipboard:history:get).
-    if (channel) {
-      const raw = await channel.send('clipboard:history:get', {
-        page: targetPage,
-        keyword: nextKeyword,
-      })
-      const items = Array.isArray(raw?.items)
-        ? raw.items.map((item: any) => mapTransportItemToPluginItem(item))
-        : []
-      const total = isFiniteNumber(raw?.total) ? Number(raw.total) : items.length
-      const page = isFiniteNumber(raw?.page) ? Number(raw.page) : targetPage
-      const pageSize = isFiniteNumber(raw?.pageSize)
-        ? Number(raw.pageSize)
-        : isFiniteNumber(raw?.limit)
-          ? Number(raw.limit)
-          : 20
-
-      const imageSample = items.find((entry: PluginClipboardItem) => entry.type === 'image')
+      const normalized = normalizeHistoryResponse(sdkPayload, targetPage)
+      const imageSample = normalized.history.find((entry: PluginClipboardItem) => entry.type === 'image')
       if (imageSample) {
         debugLog('loadHistory:image-sample', {
           hasThumbnail: Boolean(imageSample.thumbnail),
@@ -399,49 +299,28 @@ export function useClipboardManager() {
         })
       }
 
-      debugLog('loadHistory:source', { source: 'channel:clipboard:history:get' })
-      return { history: items, total, page, pageSize }
+      debugLog('loadHistory:source', { source: 'sdk' })
+      return normalized
     }
-
-    return { history: [], total: 0, page: targetPage, pageSize: 20 }
+    catch (error) {
+      debugLog('loadHistory:sdk-error', { error: formatError(error) })
+      return { history: [], total: 0, page: targetPage, pageSize: 20 }
+    }
   }
 
   async function setFavoriteCompat(id: number, isFavorite: boolean): Promise<void> {
-    if (channel) {
-      await channel.send('clipboard:history:set-favorite', { id, isFavorite })
-      return
-    }
     await clipboardHistory.setFavorite({ id, isFavorite })
   }
 
   async function deleteItemCompat(id: number): Promise<void> {
-    if (channel) {
-      await channel.send('clipboard:history:delete', { id })
-      return
-    }
     await clipboardHistory.deleteItem({ id })
   }
 
   async function clearHistoryCompat(): Promise<void> {
-    if (channel) {
-      await channel.send('clipboard:history:clear')
-      return
-    }
     await clipboardHistory.clearHistory()
   }
 
   async function copyAndPasteCompat(payload: Record<string, unknown>): Promise<boolean> {
-    if (channel) {
-      const response = await channel.send('clipboard:action:copy-and-paste', payload)
-      if (response && typeof response === 'object' && 'success' in response) {
-        const result = response as { success?: boolean, message?: string }
-        if (!result.success && result.message)
-          throw new Error(result.message)
-        return Boolean(result.success)
-      }
-      return true
-    }
-
     if (clipboard?.copyAndPaste)
       return clipboard.copyAndPaste(payload as any)
     return false
@@ -538,7 +417,7 @@ export function useClipboardManager() {
 
     const content = (item.content ?? '').trim()
     if (!content)
-      return ''
+      return resolveClipboardDetailImageSource(item)
     return content.startsWith('data:') ? content : ensureTFileUrl(content)
   }
 
@@ -938,7 +817,7 @@ export function useClipboardManager() {
       const payload = cloneClipboardItem(item)
 
       // 优先使用新的 copyAndPaste API
-      if (clipboard?.copyAndPaste || channel) {
+      if (clipboard?.copyAndPaste) {
         let success = false
         if (item.type === 'image') {
           const imageSource = await resolveImageSource(item)

@@ -3,15 +3,20 @@ export function ensureTFileUrl(value?: string | null): string {
   if (!trimmed)
     return 'tfile://'
 
-  if (/^(?:tfile|data|https?|blob):/i.test(trimmed))
+  if (/^(?:data|https?|blob):/i.test(trimmed))
     return trimmed
 
-  if (/^file:/i.test(trimmed))
-    return trimmed.replace(/^file:/i, 'tfile:')
-
-  const isWindowsPath = /^[a-z]:[\\/]/i.test(trimmed)
-  const normalized = (isWindowsPath ? trimmed.replace(/\\/g, '/') : trimmed).replace(/^file:\/\//i, '')
-  const encoded = encodeURI(normalized).replace(/#/g, '%23')
+  const rawPath = trimmed
+    .replace(/^tfile:(?:\/\/)?/i, '')
+    .replace(/^file:(?:\/\/)?/i, '')
+  const decodedPath = safeDecodeUri(rawPath)
+  const normalizedPath = decodedPath.replace(/\\/g, '/')
+  const windowsCandidate = normalizedPath.replace(/^\/+/, '')
+  const isWindowsPath = /^[a-z]:\//i.test(windowsCandidate)
+  const absolutePath = isWindowsPath
+    ? windowsCandidate
+    : `/${normalizedPath.replace(/^\/+/, '')}`
+  const encoded = encodeURI(absolutePath).replace(/#/g, '%23')
 
   if (isWindowsPath)
     return `tfile:///${encoded.replace(/^\/+/, '')}`
@@ -24,4 +29,13 @@ export function ensureTFileUrl(value?: string | null): string {
 
 export function isDataUrl(value?: string | null): boolean {
   return typeof value === 'string' && value.startsWith('data:')
+}
+
+function safeDecodeUri(value: string): string {
+  try {
+    return decodeURI(value)
+  }
+  catch {
+    return value
+  }
 }

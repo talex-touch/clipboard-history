@@ -16,10 +16,10 @@ const props = defineProps<{
   alt?: string
 }>()
 
-const hdLoaded = ref(false)
-const hdSrc = ref('')
-const fallbackReason = ref<'timeout' | 'error' | ''>('')
-const loadRequestId = ref(0)
+const currentSrc = ref('')
+const currentRequestId = ref(0)
+const imageLoaded = ref(false)
+const fallbackReason = ref<'error' | ''>('')
 
 function debugLog(stage: string, meta?: Record<string, unknown>) {
   const ts = new Date().toISOString()
@@ -31,69 +31,77 @@ function debugLog(stage: string, meta?: Record<string, unknown>) {
     console.debug(`[PreviewImage][${ts}] ${stage}`)
 }
 
-// Watch for item changes to reset and trigger progressive loading
+function resolvePreferredSrc(): string {
+  if (props.thumbnailOnly)
+    return props.thumbnail || props.src
+  return props.src || props.thumbnail || ''
+}
+
 watch(
-  () => [props.src, props.thumbnail] as const,
-  ([newSrc, newThumbnail]) => {
-    const requestId = ++loadRequestId.value
-    hdLoaded.value = false
-    hdSrc.value = ''
+  () => [props.src, props.thumbnail, props.thumbnailOnly] as const,
+  ([newSrc, newThumbnail, thumbnailOnly]) => {
+    currentRequestId.value += 1
+    currentSrc.value = resolvePreferredSrc()
+    imageLoaded.value = false
     fallbackReason.value = ''
 
     debugLog('load:start', {
-      requestId,
+      requestId: currentRequestId.value,
       hasSrc: Boolean(newSrc),
       hasThumbnail: Boolean(newThumbnail),
       sameSource: newSrc === newThumbnail,
+      thumbnailOnly,
+      currentSrc: currentSrc.value.slice(0, 96),
     })
-
-    if (!newSrc || !newThumbnail || newSrc === newThumbnail) {
-      hdLoaded.value = true
-      debugLog('load:skip', { requestId })
-      return
-    }
-
-    // Preload full resolution image
-    const img = new Image()
-    const loadTimeout = setTimeout(() => {
-      if (requestId !== loadRequestId.value)
-        return
-      hdLoaded.value = true
-      fallbackReason.value = 'timeout'
-      debugLog('load:timeout', { requestId, source: newSrc.slice(0, 96) })
-    }, 2500)
-    img.onload = () => {
-      if (requestId !== loadRequestId.value)
-        return
-      clearTimeout(loadTimeout)
-      hdSrc.value = newSrc
-      hdLoaded.value = true
-      fallbackReason.value = ''
-      debugLog('load:success', { requestId, source: newSrc.slice(0, 96) })
-    }
-    img.onerror = () => {
-      if (requestId !== loadRequestId.value)
-        return
-      clearTimeout(loadTimeout)
-      hdLoaded.value = true
-      fallbackReason.value = 'error'
-      debugLog('load:error', { requestId, source: newSrc.slice(0, 96) })
-    }
-    img.src = newSrc
   },
   { immediate: true },
 )
 
-// Determine which image to display
-const displaySrc = computed(() => {
-  if (hdLoaded.value && hdSrc.value) {
-    return hdSrc.value
+function handleLoad() {
+  imageLoaded.value = true
+  debugLog('load:success', {
+    requestId: currentRequestId.value,
+    source: currentSrc.value.slice(0, 96),
+  })
+}
+
+function handleError() {
+  const failedSrc = currentSrc.value
+  const thumbnail = props.thumbnail || ''
+  const canFallbackToThumbnail = Boolean(
+    thumbnail
+    && failedSrc
+    && thumbnail !== failedSrc,
+  )
+
+  if (canFallbackToThumbnail) {
+    currentSrc.value = thumbnail
+    imageLoaded.value = false
+    fallbackReason.value = 'error'
+    debugLog('load:fallback-thumbnail', {
+      requestId: currentRequestId.value,
+      failedSource: failedSrc.slice(0, 96),
+      thumbnail: thumbnail.slice(0, 96),
+    })
+    return
   }
-  return props.thumbnail || props.src
-})
+
+  imageLoaded.value = true
+  fallbackReason.value = 'error'
+  debugLog('load:error', {
+    requestId: currentRequestId.value,
+    source: failedSrc.slice(0, 96),
+  })
+}
 
 const isLoadingHD = computed(() => {
-  return Boolean(props.thumbnail && props.src !== props.thumbnail && !hdLoaded.value)
+  return Boolean(
+    props.thumbnail
+    && props.src
+    && props.src !== props.thumbnail
+    && currentSrc.value === props.src
+    && !imageLoaded.value,
+  )
 })
 
 const isShowingFallback = computed(() => {
@@ -101,7 +109,7 @@ const isShowingFallback = computed(() => {
     props.thumbnail
     && (
       props.thumbnailOnly
-      || (props.src && props.src !== props.thumbnail && fallbackReason.value)
+      || (currentSrc.value === props.thumbnail && fallbackReason.value)
     ),
   )
 })
@@ -109,9 +117,7 @@ const isShowingFallback = computed(() => {
 const fallbackText = computed(() => {
   if (props.thumbnailOnly)
     return '原图暂不可用，正在显示缩略图'
-  return fallbackReason.value === 'timeout'
-    ? '原图加载超时，正在显示缩略图'
-    : '原图加载失败，正在显示缩略图'
+  return '原图加载失败，正在显示缩略图'
 })
 </script>
 
@@ -119,9 +125,12 @@ const fallbackText = computed(() => {
   <div class="progressive-image h-full flex items-center justify-center">
     <div class="image-container relative">
       <img
-        :src="displaySrc"
+        :key="currentSrc"
+        :src="currentSrc"
         :alt="alt || '剪贴图片预览'"
         class="preview-img max-w-full w-full rounded-3 object-contain transition-all duration-300"
+        @load="handleLoad"
+        @error="handleError"
       >
       <div v-if="isLoadingHD" class="loading-indicator">
         <span class="i-carbon-image text-lg opacity-60" />

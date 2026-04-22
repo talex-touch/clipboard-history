@@ -4,6 +4,8 @@ import { useIntersectionObserver } from '@vueuse/core'
 import { computed, ref, watch } from 'vue'
 import { getItemKey } from '~/composables/clipboardUtils'
 import { useClipboardContentInfo } from '~/composables/useClipboardContentInfo'
+import { resolveClipboardListImageSource } from '~/utils/clipboard-image'
+import { ensureTFileUrl } from '~/utils/tfile'
 
 const props = defineProps<{
   item: PluginClipboardItem
@@ -81,18 +83,10 @@ function toTFileUrl(path: string): string | null {
   if (!trimmed)
     return null
 
-  if (trimmed.startsWith('tfile://'))
-    return trimmed
-
   if (trimmed.startsWith('data:'))
     return trimmed
 
-  const withoutScheme = trimmed.replace(/^file:\/\//i, '')
-  const isWindows = /^[a-z]:\\/i.test(withoutScheme)
-  const normalised = isWindows ? withoutScheme.replace(/\\/g, '/') : withoutScheme
-  const encoded = encodeURI(normalised).replace(/#/g, '%23')
-  const prefix = encoded.startsWith('/') || isWindows ? 'tfile:///' : 'tfile://'
-  return `${prefix}${encoded.startsWith('/') ? encoded.slice(1) : encoded}`
+  return ensureTFileUrl(trimmed)
 }
 
 function resolveFilePreviewSrc(item: PluginClipboardItem): string | null {
@@ -116,8 +110,11 @@ const previewImage = computed(() => {
   if (!item)
     return null
 
-  if (item.thumbnail)
-    return item.thumbnail
+  if (item.type === 'image') {
+    const imageSource = resolveClipboardListImageSource(item)
+    if (imageSource)
+      return imageSource
+  }
 
   if (item.type === 'image') {
     if (typeof item.content === 'string' && item.content.startsWith('data:'))

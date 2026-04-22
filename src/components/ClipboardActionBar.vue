@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { PluginClipboardItem } from '@talex-touch/utils/plugin/sdk/types'
-import { getActiveAppSnapshot } from '@talex-touch/utils/plugin/sdk'
+import { getTypedActiveAppSnapshot } from '@talex-touch/utils/plugin/sdk'
 import { computed, onMounted, ref } from 'vue'
 import { useCommandPalette } from '~/composables/useCommandPalette'
 
@@ -81,7 +81,7 @@ if (palette) {
 
 onMounted(async () => {
   try {
-    const snapshot = await getActiveAppSnapshot().catch(() => null)
+    const snapshot = await getTypedActiveAppSnapshot().catch(() => null)
     const candidates = [snapshot?.displayName, snapshot?.windowTitle, snapshot?.identifier]
     const resolved = candidates.find(name => typeof name === 'string' && name.trim().length)
     if (resolved)
